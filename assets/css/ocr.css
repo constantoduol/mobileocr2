@@ -1,0 +1,100 @@
+.main_button {
+    border-radius:150px;
+    width : 150px;
+    height: 150px;
+    font-size:15px;
+    color:#fff;
+    text-align:center;
+    background:#51CBEE;
+    border : solid #51CBEE 5px;
+    position: absolute;
+    line-height: 120px;
+}
+
+#container {
+    color : white;
+    font-size: 20px;
+    padding : 5px;
+    width : 100%;
+    height: 100%;
+    position:absolute;
+    background-color: rgba(0,0,0,0.5);
+    -webkit-backface-visibility: hidden;
+    overflow: hidden;
+}
+
+
+
+
+
+@keyframes fade {
+    from { opacity: 1.0; }
+    50% { opacity: 0.4; }
+    to { opacity: 1.0; }
+}
+
+@-webkit-keyframes fade {
+    from { opacity: 1.0; }
+    50% { opacity: 0.4; }
+    to { opacity: 1.0; }
+}
+
+
+@keyframes glow {
+    from { opacity: 1.0; }
+    50% { opacity: 0.4; }
+    to { opacity: 1.0; }
+}
+
+@-webkit-keyframes glow {
+    from { opacity: 1.0; }
+    50% { opacity: 0.4; }
+    to { opacity: 1.0; }
+}
+
+.blink {
+    animation:fade 3000ms infinite;
+    -webkit-animation:fade 3000ms infinite;
+}
+
+.pulse-red {
+    background: rgba(255,0,0,0.6);
+    animation:fade 1000ms infinite;
+    -webkit-animation:fade 1000ms infinite;
+}
+
+.motion {
+    -webkit-transition: 200ms ease-in-out;
+    -moz-transition: 200ms ease-in-out;
+    -ms-transition : 200ms ease-in-out;
+    -webkit-transition-property: top,left;
+    -moz-transition-property: top,left;
+    -ms-transition-property: top,left;
+}
+
+.anim_area {
+    width : 20px;
+    height: 20px;
+    border-radius: 20px;
+    position: relative;
+    top : 0px;
+    left : 0px;
+}
+
+.round_icon {
+    border-radius: 100px;
+    background-color: #51CBEE;
+}
+
+#text_container{
+   padding : 10px;
+   
+}
+
+#img_container{
+   padding : 10px;
+}
+
+#img_container img {
+    margin : 5px;
+}
