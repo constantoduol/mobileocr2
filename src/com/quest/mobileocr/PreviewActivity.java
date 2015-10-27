@@ -4,12 +4,15 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.graphics.Point;
 import android.hardware.Camera;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Display;
 import android.view.Surface;
 import android.view.ViewGroup;
 import android.view.WindowManager;
@@ -18,8 +21,13 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.FrameLayout;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 
 public class PreviewActivity extends Activity {
@@ -27,7 +35,6 @@ public class PreviewActivity extends Activity {
     private Camera mCamera;
 
     private CameraPreview mPreview;
-
 
     private FrameLayout preview;
 
@@ -83,6 +90,8 @@ public class PreviewActivity extends Activity {
         infoView = (WebView) findViewById(R.id.info_view);
         initialInfoViewLayout = infoView.getLayoutParams();
         infoView.setBackgroundColor(0x00000000);
+        //LinearLayout view = new LinearLayout(this);
+        //view.setLayoutParams(initialInfoViewLayout);
         WebSettings settings = infoView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDatabaseEnabled(true);
@@ -99,16 +108,24 @@ public class PreviewActivity extends Activity {
         infoView.addJavascriptInterface(new JavascriptExtensions(), "jse");
         infoView.setWebChromeClient(webChrome);
         infoView.loadUrl("file:///android_asset/template.html");
+        //set the position of the aperture
+        
+    }
+    
+    private int[] getScreenDims(){
+        Display display = getWindowManager().getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+        int width = size.x;
+        int height = size.y;
+        return new int[]{width,height};
     }
 
 
-    public static void setCameraDisplayOrientation(Activity activity,
-                                                   int cameraId, android.hardware.Camera camera) {
-        android.hardware.Camera.CameraInfo info =
-                new android.hardware.Camera.CameraInfo();
-        android.hardware.Camera.getCameraInfo(cameraId, info);
-        int rotation = activity.getWindowManager().getDefaultDisplay()
-                .getRotation();
+    public static void setCameraDisplayOrientation(Activity activity, int cameraId, Camera camera) {
+        Camera.CameraInfo info = new Camera.CameraInfo();
+        Camera.getCameraInfo(cameraId, info);
+        int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
         int degrees = 0;
         switch (rotation) {
             case Surface.ROTATION_0: degrees = 0; break;
@@ -166,7 +183,10 @@ public class PreviewActivity extends Activity {
                 @Override
                 public void run(){
                     Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
-                    String resp = MainActivity.getInstance().getPlugin().recogniseText(bitmap);
+                    Bitmap rotatedBitmap = rotateBitmap(bitmap);//rotate first then crop
+                    Bitmap croppedBitmap = cropBitmap(rotatedBitmap);
+                    saveImage(croppedBitmap);
+                    String resp = MainActivity.getInstance().getPlugin().recogniseText(croppedBitmap);
                     Log.i("apppp",resp);
                     extractMeaning(resp);
                     //put the text in the webview
@@ -194,14 +214,13 @@ public class PreviewActivity extends Activity {
     private void extractMeaning(String text){
        // final String cleanText = text.replaceAll("[^\\w\\s]","");
         final String cleanText = text;
-        Log.i("apppp", cleanText);
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 infoView.loadUrl("javascript:app.stopLoad()");
                 String encoded = Uri.encode(cleanText);
                 //we need to increase the size of infoview to show what we found
-                infoView.setLayoutParams(rootView.getLayoutParams());
+                //infoView.setLayoutParams(rootView.getLayoutParams());
                 infoView.loadUrl("javascript:app.loadContent('"+encoded+"')");//display the text
                 
                 infoView.loadUrl("javascript:app.loadUserAgree()");
@@ -217,7 +236,7 @@ public class PreviewActivity extends Activity {
                 boolean isSafe = Boolean.parseBoolean(safe);
                 infoView.loadUrl("javascript:app.loadImages('')");//clear the images
                 infoView.loadUrl("javascript:app.loadContent('')");//clear the text
-                infoView.setLayoutParams(initialInfoViewLayout);
+                //infoView.setLayoutParams(initialInfoViewLayout);
                 mPreview.setSafeToTakePicture(isSafe);
             }
         });
@@ -226,7 +245,40 @@ public class PreviewActivity extends Activity {
     public static PreviewActivity getInstance() {
         return previewActivity;
     }
-
+    
+    private void saveImage(Bitmap imageBitmap){
+        try {
+            File image = new File(MainActivity.getInstance().getPlugin().getFileStorage(), "img.jpg");
+            image.createNewFile();
+            FileOutputStream out = new FileOutputStream(image);
+            imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
+            out.close();
+        } catch (IOException ex) {
+            Logger.getLogger(PreviewActivity.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    //crops the given input bitmap
+    private Bitmap cropBitmap(Bitmap imageBitmap) {
+        Integer originalWidth = imageBitmap.getWidth();//480
+        Integer originalHeight = imageBitmap.getHeight();//640
+        int startX = 0;
+        int startY = originalHeight*3/7; //divide the screen into 7 parts
+        Log.i("apppp", "java height : "+originalHeight);
+        Log.i("apppp", "java offset : "+startY);
+        Integer newWidth = originalWidth - 2*startX;
+        Integer newHeight = originalHeight - 2*startY;
+        return Bitmap.createBitmap(imageBitmap,startX, startY,newWidth,newHeight);
+    }
+    
+    //rotates through 90 degrees
+    private Bitmap rotateBitmap(Bitmap original){
+        Matrix matrix = new Matrix();
+        matrix.postRotate(90);
+        Bitmap scaledBitmap = Bitmap.createScaledBitmap(original,original.getWidth(),original.getHeight(), true);
+        Bitmap rotatedBitmap = Bitmap.createBitmap(scaledBitmap,0,0,scaledBitmap.getWidth(),scaledBitmap.getHeight(),matrix,true);
+        return rotatedBitmap;
+    }
 
 
 }

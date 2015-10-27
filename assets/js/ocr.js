@@ -28,6 +28,15 @@ App.prototype.doResize = function () {
     }
 };
 
+App.prototype.initAperture = function(){
+    var height = app.getDim()[1];
+    var topOffset = height*3/7;
+    var apertureHeight = height*1/7;
+    $("#aperture").css("top",topOffset+"px");  
+    $("#aperture").css("height",apertureHeight+"px"); 
+    
+};
+
 App.prototype.resize = function (options) {
     this.resizeables.push(options);
     App.prototype.doResize();
@@ -54,9 +63,8 @@ App.prototype.getDim = function () {
 
 
 App.prototype.loadContent = function (content) {
-    console.log(content);
     content = decodeURIComponent(content);
-    console.log(content);
+    $("#text_container").addClass("black-view");
     $("#text_container").html(content);
 };
 
@@ -68,8 +76,10 @@ App.prototype.startLoad = function () {
     $("#img_container").html("<img src='img/loader.gif' id='loader'>");
     app.resize({
         id: "loader",
-        width: {on: "width", factor: 0.15},
-        height: {on: "width", factor: 0.15}
+        width: {on: "width", factor: 0.25},
+        height: {on: "width", factor: 0.25},
+        left : {on : "width",factor : 0.3},
+        top : {on : "height",factor : 0.2}
     });
 };
 
@@ -78,9 +88,11 @@ App.prototype.stopLoad = function () {
 };
 
 App.prototype.loadUserAgree = function () {
-    $("#img_container").append("<hr>");
+    //$("#img_container").append("<hr>");
     var img = $("<img src='img/cancel.png' id='user_cancel' class='round_icon' style='background-color:red;position:absolute'>");
     img.click(function(){
+        //remove the black view where text content is shown
+        $("#text_container").removeClass("black-view");
         jse.setSafeToTakePicture('true');
     });
     $("#img_container").append(img);
@@ -91,11 +103,11 @@ App.prototype.loadUserAgree = function () {
         top :{on:"height",factor : 0.78}
     });
     
-    var img = $("<img src='img/proceed.png' id='user_proceed' class='round_icon blink' style='position:absolute'>");
-    img.click(function () {
+    var img1 = $("<img src='img/proceed.png' id='user_proceed' class='round_icon blink' style='position:absolute'>");
+    img1.click(function () {
         //jse.setSafeToTakePicture('true');
     });
-    $("#img_container").append(img);
+    $("#img_container").append(img1);
     app.resize({
         id: "user_proceed",
         width: {on: "width", factor: 0.25},
