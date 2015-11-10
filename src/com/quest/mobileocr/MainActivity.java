@@ -41,7 +41,6 @@ public class MainActivity extends Activity{
         wv.loadUrl("file:///android_asset/index.html");
         plugin = new AbbyyPlugin(this);
         activity = this;
-        
 
     }
 

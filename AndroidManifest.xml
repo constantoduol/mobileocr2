@@ -28,6 +28,10 @@
             android:name=".PreviewActivity"
             android:label="@string/title_activity_preview" >
         </activity>
+        <activity
+            android:name=".ActionActivity"
+            android:label="@string/title_activity_action" >
+        </activity>
     </application>
 
 </manifest>

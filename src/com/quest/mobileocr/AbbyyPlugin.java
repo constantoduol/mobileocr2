@@ -19,9 +19,6 @@ import com.abbyy.mobile.ocr4.RecognitionManager.RotationType;
 import com.abbyy.mobile.ocr4.layout.MocrPrebuiltLayoutInfo;
 import com.quest.mobileocr.RecognitionContext.RecognitionTarget;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -29,7 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-//Include the abbyy libraries or other files
+//include the abbyy libraries or other files
 public class AbbyyPlugin implements RecognitionCallback {
 
     private Uri _imageUri;
@@ -40,11 +37,11 @@ public class AbbyyPlugin implements RecognitionCallback {
     private static final String _dictionariesFileExtension = ".mp3";
     private static final String _keywordsFileExtension = ".mp3";
 
-    private static String FILE_SUBDIRECTORY = "Quest OCR";
+    private static final String FILE_SUBDIRECTORY = "Quest OCR";
 
     private static File fileDirectory;
 
-    private MainActivity activity;
+    private final MainActivity activity;
 
     public AbbyyPlugin(MainActivity activity) {
         this.activity = activity;
@@ -74,12 +71,12 @@ public class AbbyyPlugin implements RecognitionCallback {
             Engine.loadNativeLibrary();
             FileLicense license = new FileLicense(
                     assetDataSource,
-                    this._licenseFile,
-                    this._applicationID);
+                    AbbyyPlugin._licenseFile,
+                    AbbyyPlugin._applicationID);
             Engine.DataFilesExtensions ext = new Engine.DataFilesExtensions(
-                    this._patternsFileExtension,
-                    this._dictionariesFileExtension,
-                    this._keywordsFileExtension);
+                    AbbyyPlugin._patternsFileExtension,
+                    AbbyyPlugin._dictionariesFileExtension,
+                    AbbyyPlugin._keywordsFileExtension);
             Engine.createInstance(dataSources, license, ext);
 
             RecognitionContext.createInstance(context);
@@ -140,21 +137,12 @@ public class AbbyyPlugin implements RecognitionCallback {
 
     public String recogniseText(Bitmap image) {
         try {
-//			//Get the image uri argument from the json.
-//			_imageUri = Uri.parse(uri);
-//			if (_imageUri == null) {
-//				throw new IllegalArgumentException("Missing image uri");
-//			} else {
-//				System.err.println("uri is not null");
-//			}
-
             //Change to synchronous method
-            startRecognition(image);
-
+            //startRecognition(image);
             return startRecognition(image);
         } catch (Exception e) {
             System.err.println("Exception: " + e.getMessage());
-            return "Error: performOCR();;" + e.getMessage();
+            return "Error: performOCR();" + e.getMessage();
         }
     }
 
@@ -180,7 +168,7 @@ public class AbbyyPlugin implements RecognitionCallback {
         //Image processing options
         int imageProcessingOptions = RecognitionConfiguration.ImageProcessingOptions.PROHIBIT_VERTICAL_CJK_TEXT;
         imageProcessingOptions |= RecognitionConfiguration.ImageProcessingOptions.DETECT_PAGE_ORIENTATION;
-
+        imageProcessingOptions |= RecognitionConfiguration.ImageProcessingOptions.FIND_ALL_TEXT;
         //Set the img proc options of the config
         recognitionConfiguration.setImageProcessingOptions(imageProcessingOptions);
 
@@ -223,8 +211,8 @@ public class AbbyyPlugin implements RecognitionCallback {
 
             }
             //Return the result
-            return result;
         }
+        return result;
     }
 
     private String startRecognition() {

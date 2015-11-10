@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Properties Editor</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="css/bootstrap.min.css" rel="stylesheet" />
+        <link href="css/ocr.css" rel="stylesheet" />
+        <script type="text/javascript" src="js/jquery.js"></script>
+        <script type="text/javascript" src="js/bootstrap.min.js"></script>
+        <script type="text/javascript" src="js/ui.js"></script>
+        <script type="text/javascript" src="js/ocr.js"></script>
+        <style>
+            .input-group-addon {
+                font-size : 30px;
+
+            }
+
+            input[type="text"]{
+                font-size : 20px;
+                height : 40px;
+            }
+
+            .info {
+                background : #51CBEE;
+                font-size : 20px;
+                padding : 10px;
+                color : white;
+                position : fixed;
+                width : 100%;
+                top : 0;
+                left : 0;
+                z-index: 999;
+                height: 50px;
+            }
+
+            .button_area {
+                display: flex;
+                position: fixed;
+                width: 100%;
+                z-index: 999;
+                background-color: lightgrey;
+            }
+
+            .btn {
+                width: 40%;
+                font-size: 16px;
+                background :  #51CBEE;
+                border-radius: 0px;
+                border : 0px;
+                margin : 10px;
+            }
+            
+            .form-control {
+               border: 2px solid rgb(204, 204, 204);
+               width : 90%;
+            }
+            
+            
+            #detected_text {
+                background-color: rgb(211, 211, 211);
+                padding: 5px;
+                font-size: 20px;
+                position: fixed;
+                width : 100%;
+                top : 50px;
+                left : 0;
+                height: 30px;
+            }
+            
+            #data_type_div {
+                position: fixed;
+                width: 100%;
+                top : 80px;
+                left: 0;
+                height : 20px;
+                font-size : 16px;
+            }
+            
+            #property_div {
+                margin-top : 120px;
+                overflow : auto;
+            }
+            
+            .save_icon {
+                padding : 15px;
+            }
+            
+            #data_type{
+                width : 100%;
+                border-radius: 0px;
+                border-bottom : 2px solid
+            }
+            
+
+        </style>
+    </head>
+    <body>
+        <div class="info">
+            Save Record
+            <span style="margin-left:20px;" class="save_icon" id="phone_save">
+                <img src="img/phone.png" style="width:25px">
+            </span>
+            <span class="save_icon" id="cloud_save">
+                <img src="img/cloud.png" style="width:30px">
+            </span>
+        </div>
+        <div id="detected_text">
+           
+        </div>
+        <div id="data_type_div">
+            <input type="text" id="data_type" class="form-control" placeholder="data category e.g Driver" >
+        </div>
+        <div id="property_div">
+            
+        </div>
+        <div class='button_area'>
+            <input type='button' value='Add Property' class="btn btn-primary" onclick="app.addProperty()"/>
+            <input type='button' value='Save' class="btn btn-primary"/>
+        </div>
+    </body>
+</html>

@@ -30,21 +30,22 @@
     width: 100%;
     border-bottom : 2px solid;
     border-top : 2px solid;
-    border-bottom-color: #51CBEE;
-    border-top-color:  #51CBEE;    
+    border-bottom-color: red;
+    border-top-color:  red;    
 }
 
-#loader {
+.icon {
     position: absolute;
     top : 0px;
     left: 0px;
 }
 
+
 .black-view {
     background-color: rgba(0,0,0,0.5);
-    padding : 10px;
+    padding : 20px;
     color : white;
-    height : 80px;
+    height : 110px;
 }
 
 
@@ -110,15 +111,50 @@
     background-color: #51CBEE;
 }
 
-#text_container{
-   padding : 10px;
-   
-}
 
-#img_container{
+#img_container {
    padding : 10px;
 }
 
 #img_container img {
     margin : 5px;
+}
+
+.long_link {
+    background-color: rgb(29, 139, 232);
+    padding: 12px;
+    border-bottom: 1px solid lightblue;
+    cursor: pointer;
+    font-size: 18px;
+    color:white;
+}
+
+.long_link:hover {
+    background-color: rgb(135, 206, 235);
+}
+
+#action_select_container {
+    background-color : rgb(29, 139, 232);
+    padding: 5px;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+.modal-content {
+    border-radius: 0px;
+}
+
+#modal_content_area {
+    font-size: 16px;
+}
+
+h4 {
+   color : rgb(29, 139, 232); 
+}
+
+.symbol {
+    padding: 5px;
+    text-align: center;
+    font-size: 30px;
+    background-color: lightgrey;
 }

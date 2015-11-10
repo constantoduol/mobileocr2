@@ -13,7 +13,7 @@ public class Accelerometer implements SensorEventListener {
 
     private float[] linear_acceleration = new float[3];
 
-    private final static float STILLNESS_FACTOR = 0.05F;
+    private final static float STILLNESS_FACTOR = 0.07F;
 
 
     @Override

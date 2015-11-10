@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>USSD</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link href="css/bootstrap.min.css" rel="stylesheet" />
+        <link href="css/ocr.css" rel="stylesheet" />
+        <script type="text/javascript" src="js/jquery.js"></script>
+        <script type="text/javascript" src="js/bootstrap.min.js"></script>
+        <script type="text/javascript" src="js/ui.js"></script>
+        <script type="text/javascript" src="js/ocr.js"></script>
+        <style>
+            .input-group-addon {
+                font-size : 30px;
+                
+            }
+            
+            input[type="text"]{
+                font-size : 20px;
+                height : 50px;
+            }
+            
+            .info {
+                background : #51CBEE;
+                font-size : 20px;
+                padding : 10px;
+                color : white;
+            }
+            
+            .button_area {
+                margin-top : 20px;
+            }
+            
+            .btn {
+                width: 100%;
+                font-size: 30px;
+                background :  #51CBEE;
+                border-radius: 0px;
+                border:0px;
+            }
+            
+        </style>
+    </head>
+    <body>
+        <div class="info">
+            USSD Top Up  
+        </div>
+        <div>
+            <div class="symbol">*</div>
+            <input type="text" class="form-control" id="ussd_prefix" placeholder="e.g 141">
+            <div class="symbol">*</div>
+            <input type="text" class="form-control" id="ussd_postfix" placeholder="e.g 1234 34343 3334 3432">
+            <div class="symbol">#</div>
+        </div>
+        
+        <div class='button_area'>
+            <input type='button' value='Top Up' class="btn btn-primary"/>
+        </div>
+    </body>
+</html>

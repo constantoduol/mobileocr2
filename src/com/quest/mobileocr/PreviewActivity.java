@@ -2,6 +2,7 @@ package com.quest.mobileocr;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
@@ -44,7 +45,7 @@ public class PreviewActivity extends Activity {
 
     private Accelerometer meter;
 
-    private final int CAMERA_FREQUENCY = 300;
+    private final int CAMERA_FREQUENCY = 100;
 
     private final int FUTURE_PICTURE_DELAY = 3000;
 
@@ -108,8 +109,6 @@ public class PreviewActivity extends Activity {
         infoView.addJavascriptInterface(new JavascriptExtensions(), "jse");
         infoView.setWebChromeClient(webChrome);
         infoView.loadUrl("file:///android_asset/template.html");
-        //set the position of the aperture
-        
     }
     
     private int[] getScreenDims(){
@@ -184,9 +183,9 @@ public class PreviewActivity extends Activity {
                 public void run(){
                     Bitmap bitmap = BitmapFactory.decodeByteArray(data, 0, data.length);
                     Bitmap rotatedBitmap = rotateBitmap(bitmap);//rotate first then crop
-                    Bitmap croppedBitmap = cropBitmap(rotatedBitmap);
+                    Bitmap croppedBitmap = cropBitmap(rotatedBitmap);//crop the bitmap
                     saveImage(croppedBitmap);
-                    String resp = MainActivity.getInstance().getPlugin().recogniseText(croppedBitmap);
+                    String resp = MainActivity.getInstance().getPlugin().recogniseText(croppedBitmap);//recognize text in the image
                     Log.i("apppp",resp);
                     extractMeaning(resp);
                     //put the text in the webview
@@ -217,6 +216,10 @@ public class PreviewActivity extends Activity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                if(cleanText.contains("_ABBYY_")){
+                    //take care of the abbyy bug by cancelling the ocr process
+                   
+                }
                 infoView.loadUrl("javascript:app.stopLoad()");
                 String encoded = Uri.encode(cleanText);
                 //we need to increase the size of infoview to show what we found
@@ -226,18 +229,32 @@ public class PreviewActivity extends Activity {
                 infoView.loadUrl("javascript:app.loadUserAgree()");
             }
         });
-
+    }
+    
+    public void cancelOCR(){
+        resetScreen();
+        Timer timer = new Timer();
+        TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                setSafeTotakePicture("true");
+            }
+        };
+        timer.schedule(task, FUTURE_PICTURE_DELAY);
+        //say its safe to take a picture in future
     }
     
     public void setSafeTotakePicture(final String safe){
+        boolean isSafe = Boolean.parseBoolean(safe);
+        mPreview.setSafeToTakePicture(isSafe);
+    }
+    
+    public void resetScreen(){
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                boolean isSafe = Boolean.parseBoolean(safe);
                 infoView.loadUrl("javascript:app.loadImages('')");//clear the images
                 infoView.loadUrl("javascript:app.loadContent('')");//clear the text
-                //infoView.setLayoutParams(initialInfoViewLayout);
-                mPreview.setSafeToTakePicture(isSafe);
             }
         });
     }
@@ -278,6 +295,13 @@ public class PreviewActivity extends Activity {
         Bitmap scaledBitmap = Bitmap.createScaledBitmap(original,original.getWidth(),original.getHeight(), true);
         Bitmap rotatedBitmap = Bitmap.createBitmap(scaledBitmap,0,0,scaledBitmap.getWidth(),scaledBitmap.getHeight(),matrix,true);
         return rotatedBitmap;
+    }
+    
+    public void startActionActivity(String actionType, String detectedText){
+        Intent intent = new Intent(this,ActionActivity.class);
+        intent.putExtra("action_type", actionType);
+        intent.putExtra("detected_text", detectedText);
+        startActivity(intent);  
     }
 
 

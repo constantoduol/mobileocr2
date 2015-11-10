@@ -8,12 +8,14 @@
     <link href="css/bootstrap.min.css" rel="stylesheet" />
     <link href="css/ocr.css" rel="stylesheet" />
     <script type="text/javascript" src="js/jquery.js"></script>
+    <script type="text/javascript" src="js/ui.js"></script>
     <script type="text/javascript" src="js/ocr.js"></script>
 </head>
 <body style="background-color: rgba(0,0,0,0.8);">
-    <div class="btn main_button blink" id="main_button" onclick="jse.detect()"><img id="camera_img" src='img/camera.png'/></div>
-</body>
-<script type="text/javascript">
+    <div class="btn main_button blink" id="main_button" onclick="jse.detect()">
+        <img id="camera_img" src='img/camera.png' alt="start recognition"/>
+    </div>
+    <script type="text/javascript">
         app.resize({
             id : "main_button",
             width : {on : "width", factor : 0.5},
@@ -21,13 +23,14 @@
             top : {on : "height", factor : 0.3},
             left : {on : "width", factor : 0.25},
             "line-height": {on : "width", factor : 0.4},
-            "border-radius" : {on : "width", factor : 0.5},
+            "border-radius" : {on : "width", factor : 0.5}
         });
         
         app.resize({
             id : "camera_img",
-            width : {on : "width", factor : 0.3},
+            width : {on : "width", factor : 0.3}
         });
 
   </script>
+</body>
 </html>
