@@ -36,6 +36,39 @@ public class JavascriptExtensions {
     public void saveRecord(String json){
        ActionActivity.getInstance().saveRecord(json);
     }
-
-
+    
+    @JavascriptInterface
+    public String getItem(String itemName){
+        return Database.get(itemName);
+    }
+    
+    @JavascriptInterface
+    public void setItem(String itemName,String itemValue){
+        Database.put(itemName, itemValue);
+    }
+    
+    @JavascriptInterface
+    public void removeItem(String itemName){
+        Database.remove(itemName);
+    }
+    
+    @JavascriptInterface
+    public void startLoad(String msg) {
+        ActionActivity.getInstance().showProgress(msg);
+    }
+    
+    @JavascriptInterface
+    public void stopLoad() {
+        ActionActivity.getInstance().dismissProgress();
+    }
+    
+    @JavascriptInterface
+    public void toast(String msg) {
+        ActionActivity.getInstance().toast(msg);
+    }
+    
+    @JavascriptInterface
+    public String getExistingData(String detectedText){
+        return ActionActivity.getInstance().getExistingData(detectedText);
+    }
 }

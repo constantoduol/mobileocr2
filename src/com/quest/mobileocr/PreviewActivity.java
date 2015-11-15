@@ -51,11 +51,9 @@ public class PreviewActivity extends Activity {
 
     private WebView infoView;
     
-    private FrameLayout rootView;
-    
-    private ViewGroup.LayoutParams initialInfoViewLayout;
-    
     private static PreviewActivity previewActivity;
+    
+    private static Database db;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -68,8 +66,8 @@ public class PreviewActivity extends Activity {
         // Create our Preview view and set it as the content of our activity.
         mPreview = new CameraPreview(this, mCamera);
         preview = (FrameLayout) findViewById(R.id.camera_preview);
-        rootView =  (FrameLayout) findViewById(R.id.root_view);
-
+       // rootView =  (FrameLayout) findViewById(R.id.root_view);
+        db = new Database(this);
         initWebView();
 
         preview.addView(mPreview);
@@ -89,10 +87,7 @@ public class PreviewActivity extends Activity {
 
     private void initWebView(){
         infoView = (WebView) findViewById(R.id.info_view);
-        initialInfoViewLayout = infoView.getLayoutParams();
-        infoView.setBackgroundColor(0x00000000);
-        //LinearLayout view = new LinearLayout(this);
-        //view.setLayoutParams(initialInfoViewLayout);
+        infoView.setBackgroundColor(0x00000000);;
         WebSettings settings = infoView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDatabaseEnabled(true);

@@ -17,6 +17,8 @@ public class MainActivity extends Activity{
     private static AbbyyPlugin plugin;
 
     private static MainActivity activity;
+    
+    private static Database db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,12 +38,12 @@ public class MainActivity extends Activity{
                 return true;
             }
         };
+        db = new Database(this);
         wv.addJavascriptInterface(new JavascriptExtensions(), "jse");
         wv.setWebChromeClient(webChrome);
         wv.loadUrl("file:///android_asset/index.html");
         plugin = new AbbyyPlugin(this);
-        activity = this;
-
+        activity = this;;
     }
 
 

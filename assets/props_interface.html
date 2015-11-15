@@ -40,15 +40,19 @@
                 width: 100%;
                 z-index: 999;
                 background-color: lightgrey;
+                padding : 5px;
+            }
+            
+            .button_area > .btn{
+                margin : 5px;
             }
 
             .btn {
-                width: 40%;
+                width: 45%;
                 font-size: 16px;
                 background :  #51CBEE;
                 border-radius: 0px;
                 border : 0px;
-                margin : 10px;
             }
             
             .form-control {
@@ -57,28 +61,17 @@
             }
             
             
-            #detected_text {
-                background-color: rgb(211, 211, 211);
-                padding: 5px;
-                font-size: 20px;
-                position: fixed;
-                width : 100%;
-                top : 50px;
-                left : 0;
-                height: 30px;
-            }
-            
             #data_type_div {
                 position: fixed;
                 width: 100%;
-                top : 80px;
+                top : 50px;
                 left: 0;
                 height : 20px;
                 font-size : 16px;
             }
             
             #property_div {
-                margin-top : 120px;
+                margin-top : 100px;
                 overflow : auto;
             }
             
@@ -89,7 +82,7 @@
             #data_type{
                 width : 100%;
                 border-radius: 0px;
-                border-bottom : 2px solid
+                border-bottom : 2px solid lightgrey;
             }
             
 
@@ -105,9 +98,7 @@
                 <img src="img/cloud.png" style="width:30px">
             </span>
         </div>
-        <div id="detected_text">
-           
-        </div>
+     
         <div id="data_type_div">
             <input type="text" id="data_type" class="form-control" placeholder="data category e.g Driver" >
         </div>
@@ -116,7 +107,7 @@
         </div>
         <div class='button_area'>
             <input type='button' value='Add Property' class="btn btn-primary" onclick="app.addProperty()"/>
-            <input type='button' value='Save' class="btn btn-primary"/>
+            <input type='button' value='Save' class="btn btn-primary" onclick="app.saveRecord()"/>
         </div>
     </body>
 </html>

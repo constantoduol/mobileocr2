@@ -2,6 +2,8 @@ function App() {
     this.resizeables = [];
     this.ui = new UI();
     this.save_location = "phone";
+    this.api_key = "ns2g3h1m67ai3o4vr39j";
+    var self = this;
     window.onresize = App.prototype.doResize;
     $(document).ready(function(){
         var path = window.location.pathname;
@@ -12,9 +14,16 @@ function App() {
                 var modalArea = $("<div id='modal_area'></div>");
                 if (!$("#modal_area")[0])
                     $("body").append(modalArea);  
+                //setup a user id
+                var userId = jse.getItem("user_id");
+                if(!userId || userId === "null"){
+                    userId = app.rand(20);
+                    jse.setItem("user_id",userId);
+                }
+                self.user_id = userId;
             },
             "/props_interface.html": function () {
-                var height = app.getDim()[1] - 170;
+                var height = app.getDim()[1] - 150;
                 $("#property_div").css("height", height + "px");
                 $("#phone_save").click(function(){
                    app.selectSaveLocation("phone"); 
@@ -105,6 +114,35 @@ App.prototype.loadContent = function (content) {
         app.launchActionSelect();
     });
     $("#text_container").append(actionSelect);
+};
+
+App.prototype.populateExisting = function(detectedText){
+    var content = decodeURIComponent(detectedText);
+    var saveLocation = localStorage.getItem("save_location");
+    if(saveLocation === "cloud"){
+        jse.startLoad("Retrieving from cloud");
+        //do an xhr and fetch the data
+        app.xhr({
+            load: false,
+            svc: "open_data",
+            msg: "get",
+            data: {
+               where_user_id : app.user_id,
+               where_primary_key_value : content
+            },
+            success: function (data) {
+                console.log(data);
+            },
+            error: function () {
+                jse.stopLoad();
+                app.msg("There was a problem retrieving from the cloud. Please check your internet connection");
+            }
+        }); 
+    }
+    else {
+        var json = jse.getExistingData(content);
+        console.log(json);
+    }
 };
 
 App.prototype.launchActionSelect = function(){
@@ -229,15 +267,27 @@ App.prototype.loadUSSDField = function(detectedText){
 
 App.prototype.loadRecordField = function(detectedText){
     var content = decodeURIComponent(detectedText);
-    $("#detected_text").html(content);
     app.addProperty();
     $(".prop_value").val(content);
+    $(".prop_value").attr("id", "primary_key_value");
+    $(".prop_name").attr("id", "primary_key_name");
 };
 
 App.prototype.addProperty = function(){
-  var div = $("<div><input type='text' class='prop_name form-control' placeholder='e.g name' style='margin:10px;border-color: #51CBEE;'>\n\
-            <input type='text' class='prop_value form-control' placeholder='e.g sam' style='margin:10px'></div><hr>");  
-  $("#property_div").append(div);
+    var id = "prop_id_"+app.rand(6);
+    var div = $("<div><input type='button' href='#' class='close' value='x' onclick='app.removeProperty(this)' style='margin-right:10px;color:red'><br>\n\
+                <input type='text' class='prop_name form-control' placeholder='e.g name' id="+id+" style='margin:10px;border-color: #51CBEE;'>\n\
+                <input type='text' class='prop_value form-control' placeholder='e.g sam' style='margin:10px'><hr></div>");  
+    $("#property_div").append(div);
+    $("#"+id).focus();
+};
+
+App.prototype.rand = function(len){
+    return Math.ceil(Math.random()*Math.pow(10,len));
+};
+
+App.prototype.removeProperty = function(elem){
+    $(elem).parent().remove();
 };
 
 App.prototype.selectSaveLocation = function(location){
@@ -256,36 +306,98 @@ App.prototype.selectSaveLocation = function(location){
 
 App.prototype.saveRecord = function(){
     var location = localStorage.getItem("save_location");
-    var conf = confirm("Save data to "+location+" ?");
-    if(!conf) return;
     var type = $("#data_type").val();
-    if(!type){
+    if (!type) {
         app.msg("Please select a category for your data");
+        $("#data_type").focus();
         return;
     }
-    var propNames = $(".prop_name");
-    var propValues = $(".prop_values");
-    var names = [];
-    var values = [];
-    for(var x = 0; x < propNames.length; x++){
-        var name = propNames[x].value;
-        var value = propValues[x].value;
-        if(!name){
-            $(propNames[x]).focus();
-            return;
+    var m = app.ui.modal("Save data to "+location+" ?","Save Data",{
+        okText : "Save",
+        cancelText : "Cancel",
+        ok : function(){
+            var propNames = $(".prop_name");
+            var propValues = $(".prop_value");
+            var props = {};
+            for (var x = 0; x < propNames.length; x++) {
+                var name = propNames[x].value;
+                var value = propValues[x].value;
+                if (!name) {
+                    $(propNames[x]).focus();
+                    return;
+                }
+                else if(!value) {
+                    $(propValues[x]).focus();
+                    return;
+                }
+                props[name] = value;
+            }
+            var obj = {};
+            obj.properties = JSON.stringify(props);
+            obj.category = type.trim();
+            obj.user_id = app.user_id;
+            obj.primary_key_value = $("#primary_key_value").val().trim();
+            obj.primary_key_name = $("#primary_key_name").val().trim();
+            m.modal('hide');
+            location === "cloud" ? app.saveToCloud(obj) : jse.saveRecord(JSON.stringify(obj));
+            if(location === "phone"){
+                jse.toast("Data saved to phone successfully");
+            }
         }
-        else if(!value){
-           $(propValues[x]).focus();
-           return;
-        }
-        names.push(name);
-        values.push(value);
+    });
+};
+
+
+
+App.prototype.xhr = function (options) {
+    var request = {};
+    request.request_header = {};
+    request.request_header.request_svc = options.svc;
+    request.request_header.request_msg = options.msg;
+    request.request_object = options.data;
+    if (options.load) {
+        $("#load_area").html("<img src='img/loader.gif'>");
     }
-    var obj = {};
-    obj.prop_names = names;
-    obj.prop_values = values;
-    obj.type = type;
-    jse.saveRecord(JSON.stringify(obj));
+    var defaultOptions = {
+        method: "post",
+        url: "/server",
+        data: "json=" + encodeURIComponent(JSON.stringify(request)),
+        dataFilter: function (data) {
+            if (options.load) {
+                $("#load_area").html("");
+            }
+            var json = JSON.parse(data);
+            if (json.request_msg === "auth_required") {
+                window.location = "index.html";
+            }
+            return json;
+        }
+    };
+    defaultOptions.success = options.success;
+    defaultOptions.error = options.error;
+    return $.ajax(defaultOptions);
+};
+
+App.prototype.saveToCloud = function(data){
+    jse.startLoad("Saving to cloud...");
+    data.api_key = app.api_key;
+    data.kind = "OCR_DATA";
+    app.xhr({
+        load: false,
+        svc: "open_data",
+        msg: "save",
+        data: data,
+        success: function (data) {
+            if (data.response.data === "success") {
+                jse.stopLoad();
+                app.msg("Data saved to cloud successfully");
+            }
+        },
+        error: function () {
+            jse.stopLoad();
+            app.msg("There was a problem saving to the cloud. Please check your internet connection");
+        }
+    });  
 };
 
 App.prototype.msg = function(content){

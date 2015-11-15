@@ -12,12 +12,10 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import java.net.URI;
+import android.widget.Toast;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -39,6 +37,8 @@ public class ActionActivity extends Activity {
     
     private static String currentText;
     
+    private static Database db;
+    
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
@@ -59,6 +59,7 @@ public class ActionActivity extends Activity {
         };
         wv.addJavascriptInterface(new JavascriptExtensions(), "jse");
         wv.setWebChromeClient(webChrome);
+        db = new Database(this);
         wv.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -72,6 +73,9 @@ public class ActionActivity extends Activity {
                 }
                 else if(currentAction.equals("associate_action")){
                     wv.loadUrl("javascript:app.loadRecordField('"+Uri.encode(currentText)+"')");
+                    wv.loadUrl("javascript:app.populateExisting('"+Uri.encode(currentText)+"')");
+                    //check if we have an existing record
+                    
                 }
             }
             
@@ -84,8 +88,8 @@ public class ActionActivity extends Activity {
         performRequiredAction();
     }
     
-    public ProgressDialog showProgress(){
-       dialog = ProgressDialog.show(this, "","Loading. Please wait...", true);
+    public ProgressDialog showProgress(String msg){
+       dialog = ProgressDialog.show(this, "",msg, true);
        dialog.show();
        return dialog;
     }
@@ -103,7 +107,7 @@ public class ActionActivity extends Activity {
         currentAction = type;
         currentText = text;
         if(type.equals("web_search_action")){
-            dialog = showProgress();
+            dialog = showProgress("Loading. Please wait...");
             wv.loadUrl(SEARCH_URL + text); //perform a search action based on the detected text
         }
         else if(type.equals("ussd_action")){
@@ -122,72 +126,49 @@ public class ActionActivity extends Activity {
         return activity;
     }
     
+    public void toast(String msg){
+        Toast toast = Toast.makeText(this, msg, Toast.LENGTH_SHORT);
+        toast.show();
+    }
+    
+    public String getExistingData(String content){
+        ArrayList<ArrayList<String>> data = Database.doSelect(
+                new String[]{"*"}, 
+                new String[]{"OCR_DATA"}, 
+                new String[]{"primary_key_value = '"+content.trim()+"'"});
+        Log.i("app", data.toString());
+        return data.toString();
+    }
+    
     public void saveRecord(String json){
         try {
             JSONObject obj = new JSONObject(json);
-            String type = obj.optString("type");
-            JSONArray names = obj.optJSONArray("prop_names");
-            JSONArray values = obj.optJSONArray("prop_values");
+            String category = obj.optString("category");
+            String primaryKeyValue = obj.optString("primary_key_value");
+            String primaryKeyName = obj.optString("primary_key_name");
+            String properties = obj.optString("properties");
+            //category, primary_key_name, primary_key_value, properties
+            //if category, primaryKeyValue, primaryKeyName already exist in the
+            //database we dont insert but do an update
+            boolean exists = Database.exists("OCR_DATA",
+                    new String[]{"category","primary_key_name","primary_key_value"},
+                    new String[]{category,primaryKeyName,primaryKeyValue});
+            if(exists){
+                Database.update(new String[]{"OCR_DATA"}, 
+                            new String[]{"properties = '"+properties+"'"},
+                            new String[]{"category = '"+category+"'", 
+                                         "primary_key_name = '"+primaryKeyName+"'", 
+                                         "primary_key_value = '"+primaryKeyValue+"'"});
+            }
+            else {
+                Database.doInsert("OCR_DATA",
+                    new String[]{"category","primary_key_name","primary_key_value","properties"}, 
+                    new String[]{category,primaryKeyName,primaryKeyValue,properties});
+            
+            }
         } catch (JSONException ex) {
             Logger.getLogger(ActionActivity.class.getName()).log(Level.SEVERE, null, ex);
         }
-    }
-    
-    private void resolveColumnChanges(Database db, String table, JSONObject currentColData, String[] expectedColData) {
-        //alter the table to change the data type of the column
-        //alter the table to insert the extra columns
-        List currentColNames = listToUpperCase(currentColData.optJSONArray("Field").toList());
-        List currentDataTypes = listToUpperCase(currentColData.optJSONArray("Type").toList());
-        ArrayList<String> alterRegister = new ArrayList();//keeps track of columns that have been altered
-        for (int x = 0; x < expectedColData.length; x++) {
-            //separate the column and type
-            String colAndType = expectedColData[x];
-            String[] vals = colAndType.replaceAll("\\s+", " ").split(" ");
-            String expectColName = vals[0].toUpperCase();
-            String expectType = vals[1].toUpperCase();
-            //we check whether this value exists in current data
-            int currentIndex = currentColNames.indexOf(expectColName);
-            //if it exists, we just need to verify that the data type is the same
-            if (currentIndex > -1) {
-                //this column currently exists so verify data type
-                String currentType = currentDataTypes.get(currentIndex).toString();
-                String currentCol = currentColNames.get(currentIndex).toString();
-                if (!currentType.equals(expectType) && !currentType.contains(expectType)) {
-                    //this means that the datatype for this column has changed so change it
-                    db.execute("ALTER TABLE " + table + " MODIFY " + currentCol + " " + expectType + "");
-                }
-                //ALTER TABLE tablename MODIFY columnname INTEGER;
-            } else {
-                //if it does not exist it means someone introduced a new column
-                //ALTER TABLE Employees CHANGE COLUMN empName empName VARCHAR(50) AFTER department;
-                //the strategy is to find the first column that exists before or after and use it as
-                //a reference for the column insert
-                //int expectedIndex = x; //this is where we hope the column to exist
-                //we use the after strategy
-                // boolean backwards = false;
-                if (x == 0) { //this means this is the first column and its new
-                    db.execute("ALTER TABLE " + table + " ADD " + expectColName + " " + expectType + " FIRST");
-                    alterRegister.add(expectColName);
-                } else {
-                    for (int y = (x - 1); y >= 0; y--) { //backwards
-                        String prev = expectedColData[y];
-                        String[] prevVals = prev.replaceAll("\\s+", " ").split(" ");
-                        String prevColName = prevVals[0].toUpperCase();
-                        int prevIndex = currentColNames.indexOf(prevColName); //if prev index > -1 
-                        //incase this value is in current columns or we have already added it to the columns
-                        if ((prevIndex > -1 || alterRegister.contains(prevColName)) && prevIndex < x) {
-                            //this value is the first column directly before
-                            db.execute("ALTER TABLE " + table + " ADD " + expectColName + " " + expectType + " AFTER " + prevColName + "");
-                            alterRegister.add(expectColName);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        //do the column alterations first
-        //["TRAN_FLAG TEXT","NARRATION TEXT"]
-        //["TRAN_FLAG TEXT","TRAN_TYPE TINYINT","NARRATION TEXT"]
     }
     
 }
