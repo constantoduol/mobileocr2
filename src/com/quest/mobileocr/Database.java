@@ -31,6 +31,10 @@ public class Database extends SQLiteOpenHelper {
         addTable(db, "OCR_DATA",
                 new String[]{"category", "primary_key_name","primary_key_value","properties"},
                 new String[]{"TEXT", "TEXT","TEXT","TEXT"});
+        
+        addTable(db, "PATTERN_DATA",
+                new String[]{"category", "char_map", "alpha_digit_map","length"},
+                new String[]{"TEXT", "TEXT", "TEXT", "INT"});
     }
 
     @Override
@@ -72,7 +76,7 @@ public class Database extends SQLiteOpenHelper {
      * @param data
      * @return 
      */
-    public static boolean exists(String table,String [] cols, String [] data){
+    public static boolean exists(String table,String [] cols, Object [] data){
         StringBuilder sql = new StringBuilder("SELECT * FROM "+table+" WHERE ");
         for(int x = 0; x < cols.length; x++){
             String col = cols[x];

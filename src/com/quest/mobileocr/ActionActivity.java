@@ -14,8 +14,10 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -38,6 +40,10 @@ public class ActionActivity extends Activity {
     private static String currentText;
     
     private static Database db;
+    
+    private static String specialChars = "!@#$%^&*()-_+=[]{}/\\`~|?<>,.';:";
+    
+    private static String alphaDigitMap = "abcdefghijklmnopqrstuvwxyz0123456789";
     
     @Override
     public void onCreate(Bundle icicle) {
@@ -136,8 +142,8 @@ public class ActionActivity extends Activity {
                 new String[]{"*"}, 
                 new String[]{"OCR_DATA"}, 
                 new String[]{"primary_key_value = '"+content.trim()+"'"});
-        Log.i("app", data.toString());
-        return data.toString();
+        JSONArray arr = data.size() > 0 ? new JSONArray(data.get(0)) : new JSONArray();//get the first value
+        return arr.toString();
     }
     
     public void saveRecord(String json){
@@ -166,9 +172,119 @@ public class ActionActivity extends Activity {
                     new String[]{category,primaryKeyName,primaryKeyValue,properties});
             
             }
+            saveRecordModel(category, primaryKeyValue);
         } catch (JSONException ex) {
             Logger.getLogger(ActionActivity.class.getName()).log(Level.SEVERE, null, ex);
         }
+    }
+    
+    public void saveRecordModel(String category,String primaryKeyValue){
+        int [] adMap = alphabetMap(primaryKeyValue);
+        String ad_map = "";
+        for(int a : adMap){
+            ad_map += a; 
+        }
+        String charMap = characterMap(primaryKeyValue);
+        Integer length = primaryKeyValue.length();
+        //we will save the alphaDigitmap, the character map
+        //the length of the string for a given data category
+        //there can be more than one pattern data for a given category
+        //check whether we have the specific pattern data before inserting
+        boolean exists = Database.exists("PATTERN_DATA",
+                new String[]{"category", "char_map", "alpha_digit_map","length"},
+                new Object[]{category, charMap, ad_map,length});
+        if(!exists){
+            Database.doInsert("PATTERN_DATA",
+                    new String[]{"category", "char_map", "alpha_digit_map","length"},
+                    new String[]{category, charMap, ad_map, length.toString()});
+        }
+    }
+    
+    public String getRecordModel(String primaryKeyValue){
+        try {
+            int[] adMap = alphabetMap(primaryKeyValue);
+            String ad_map = "";
+            for (int a : adMap) {
+                ad_map += a;
+            }
+            String charMap = characterMap(primaryKeyValue);
+            Integer length = primaryKeyValue.length();
+            JSONObject obj = new JSONObject();
+            obj.put("length", length);
+            obj.put("char_map", charMap);
+            obj.put("alpha_digit_map", ad_map);
+            return obj.toString();
+        } catch (JSONException ex) {
+            Logger.getLogger(ActionActivity.class.getName()).log(Level.SEVERE, null, ex);
+            return new JSONObject().toString();
+        }
+    }
+    
+    public String characterMap(String input){
+        //e.g KAG 564M is lllsdddl
+        String map = "";
+        char [] arr = input.toCharArray();
+        for(int x = 0; x < arr.length; x++){
+            Character ch = (Character)arr[x];
+            if(Character.isLetter(ch)){
+                map += "l";
+            }
+            else if(Character.isDigit(ch)){
+                map += "d";
+            }
+            else if(Character.isSpaceChar(ch)){
+                map += "s";
+            }
+            else {
+                //special character
+                int index = specialChars.indexOf(ch.toString());
+                if(index == -1){
+                    map += "x";
+                }
+                else {
+                    map += index;
+                }
+            }
+        }
+        return map;
+    }
+    
+    public int[] alphabetMap(String input){
+        //26 is for the 26 alphabet letters
+        //10 is for the digits 0 to 9
+        int [] map = new int[36]; //26 + 10
+        for(int x = 0; x < map.length; x++){
+            //count the occurrence of each letter and digit in the string and store them
+            //in the array of ints
+            map[x] = charOccurrences(input, alphaDigitMap.charAt(x));
+        }
+        return map;
+    }
+    
+    private int charOccurrences(String str, char toFind){
+        char [] arr = str.toCharArray();
+        int count = 0;
+        for(int y = 0; y < arr.length; y++){
+            if(arr[y] == toFind){
+                count++;
+            }
+        }
+        return count;
+    }
+    
+    public void interpretModel(String inputData){
+        //we make sense of the model by providing input text
+        //based on the pattern data we have we try to find the 
+        //closest match to our input string
+        //get length of the string, charmap and alpha digit map
+        int length = inputData.length();
+        
+        
+    }
+    
+    private void performUSSD(String prefix,String postfix){
+        String ussdCode = "*" + prefix + "*"+ postfix +Uri.encode("#");
+        startActivity(new Intent("android.intent.action.CALL", Uri.parse("tel:" + ussdCode)));
     }
     
 }

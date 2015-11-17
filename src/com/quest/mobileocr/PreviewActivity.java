@@ -15,7 +15,6 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
-import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.WebChromeClient;
@@ -54,6 +53,8 @@ public class PreviewActivity extends Activity {
     private static PreviewActivity previewActivity;
     
     private static Database db;
+    
+    
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -195,6 +196,33 @@ public class PreviewActivity extends Activity {
 
 
 
+    private static String cleanText(String text) {
+        char[] arr = text.toCharArray();
+        boolean foundLetterOrDigit = false;
+        for (int x = 0; x < arr.length; x++) {
+            Character ch = (Character) arr[x];
+            if (!Character.isDigit(ch) && !Character.isLetter(ch) && !foundLetterOrDigit) {
+                arr[x] = ' ';
+            } else {
+                //replace non letters and non digits
+                foundLetterOrDigit = true;
+            }
+        }
+
+        foundLetterOrDigit = false;
+        for (int x = (arr.length - 1); x >= 0; x--) {
+            Character ch = (Character) arr[x];
+            if (!Character.isDigit(ch) && !Character.isLetter(ch) && !foundLetterOrDigit) {
+                arr[x] = ' ';
+            } else {
+                //replace non letters and non digits
+                foundLetterOrDigit = true;
+            }
+        }
+        return new String(arr).trim();
+    }
+
+    
 
 
     /**
@@ -207,7 +235,7 @@ public class PreviewActivity extends Activity {
 
     private void extractMeaning(String text){
        // final String cleanText = text.replaceAll("[^\\w\\s]","");
-        final String cleanText = text;
+        final String cleanText = cleanText(text);
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -276,8 +304,6 @@ public class PreviewActivity extends Activity {
         Integer originalHeight = imageBitmap.getHeight();//640
         int startX = 0;
         int startY = originalHeight*3/7; //divide the screen into 7 parts
-        Log.i("apppp", "java height : "+originalHeight);
-        Log.i("apppp", "java offset : "+startY);
         Integer newWidth = originalWidth - 2*startX;
         Integer newHeight = originalHeight - 2*startY;
         return Bitmap.createBitmap(imageBitmap,startX, startY,newWidth,newHeight);

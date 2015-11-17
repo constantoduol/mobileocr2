@@ -3,6 +3,7 @@ function App() {
     this.ui = new UI();
     this.save_location = "phone";
     this.api_key = "ns2g3h1m67ai3o4vr39j";
+    this.server = "http://open-data-service.appspot.com/server";
     var self = this;
     window.onresize = App.prototype.doResize;
     $(document).ready(function(){
@@ -17,7 +18,7 @@ function App() {
                 //setup a user id
                 var userId = jse.getItem("user_id");
                 if(!userId || userId === "null"){
-                    userId = app.rand(20);
+                    userId = app.rand(15);
                     jse.setItem("user_id",userId);
                 }
                 self.user_id = userId;
@@ -116,22 +117,48 @@ App.prototype.loadContent = function (content) {
     $("#text_container").append(actionSelect);
 };
 
+App.prototype.javaLoad = function(msg){
+    encodeURIComponent(msg)
+};
+
 App.prototype.populateExisting = function(detectedText){
     var content = decodeURIComponent(detectedText);
     var saveLocation = localStorage.getItem("save_location");
+    function populate(data){
+        var category = data[0];
+        var primaryKeyName = data[1];
+        var primaryKeyValue = data[2];
+        var props = JSON.parse(data[3]);
+        $("#data_type").val(category);
+        $("#primary_key_name").val(primaryKeyName);
+        $("#primary_key_value").val(primaryKeyValue);
+        if (!props)
+            return;
+        var keys = Object.keys(props);
+        for (var x = 0; x < keys.length; x++) {
+            if (x === 0)
+                continue; //first property is already listed
+            var propValue = props[keys[x]];
+            app.addProperty(keys[x], propValue);
+        }
+    }
+    
     if(saveLocation === "cloud"){
         jse.startLoad("Retrieving from cloud");
         //do an xhr and fetch the data
         app.xhr({
-            load: false,
             svc: "open_data",
             msg: "get",
-            data: {
-               where_user_id : app.user_id,
-               where_primary_key_value : content
+            data : {
+                kind : "OCR_DATA",
+                where_user_id : app.user_id,
+                where_primary_key_value : content
             },
             success: function (data) {
-                console.log(data);
+                jse.stopLoad();
+                var r = data.response.data;
+                var cloudData = [r.category[0],r.primary_key_name[0], r.primary_key_value[0], r.properties[0]];
+                populate(cloudData);
             },
             error: function () {
                 jse.stopLoad();
@@ -140,8 +167,8 @@ App.prototype.populateExisting = function(detectedText){
         }); 
     }
     else {
-        var json = jse.getExistingData(content);
-        console.log(json);
+        var data = JSON.parse(jse.getExistingData(content));
+        populate(data);
     }
 };
 
@@ -267,23 +294,44 @@ App.prototype.loadUSSDField = function(detectedText){
 
 App.prototype.loadRecordField = function(detectedText){
     var content = decodeURIComponent(detectedText);
-    app.addProperty();
-    $(".prop_value").val(content);
+    app.addProperty("",content);
     $(".prop_value").attr("id", "primary_key_value");
     $(".prop_name").attr("id", "primary_key_name");
 };
 
-App.prototype.addProperty = function(){
+App.prototype.addProperty = function(propName,propValue){
+    propName = !propName ? "" : propName;
+    propValue = !propValue ? "" : propValue;
     var id = "prop_id_"+app.rand(6);
     var div = $("<div><input type='button' href='#' class='close' value='x' onclick='app.removeProperty(this)' style='margin-right:10px;color:red'><br>\n\
-                <input type='text' class='prop_name form-control' placeholder='e.g name' id="+id+" style='margin:10px;border-color: #51CBEE;'>\n\
-                <input type='text' class='prop_value form-control' placeholder='e.g sam' style='margin:10px'><hr></div>");  
+                <input type='text' class='prop_name form-control' placeholder='e.g name' value='"+propName+"' id="+id+" style='margin:10px;border-color: #51CBEE;'>\n\
+                <input type='text' class='prop_value form-control' placeholder='e.g sam' value='"+propValue+"' style='margin:10px'><hr></div>");  
     $("#property_div").append(div);
     $("#"+id).focus();
 };
 
 App.prototype.rand = function(len){
-    return Math.ceil(Math.random()*Math.pow(10,len));
+        var buffer = "";
+        var count = 0;
+        function getRandomDigit(){
+            return Math.floor(10*Math.random());
+        }
+        function getRandomLetter(){
+            var random = Math.floor(25 * Math.random()) + 97;
+            return String.fromCharCode(random); 
+        }
+        while (count < len){
+            var decision = getRandomDigit();
+            if (decision > 5){
+                buffer += getRandomDigit();
+                count++;
+            }
+            else{
+                buffer += getRandomLetter();
+                count++;
+            }
+        }
+        return buffer.toString();
 };
 
 App.prototype.removeProperty = function(elem){
@@ -354,22 +402,16 @@ App.prototype.xhr = function (options) {
     request.request_header = {};
     request.request_header.request_svc = options.svc;
     request.request_header.request_msg = options.msg;
+    options.data.api_key = app.api_key;
     request.request_object = options.data;
-    if (options.load) {
-        $("#load_area").html("<img src='img/loader.gif'>");
-    }
+    console.log(app.server);
+    console.log(JSON.stringify(request));
     var defaultOptions = {
         method: "post",
-        url: "/server",
+        url: app.server,
         data: "json=" + encodeURIComponent(JSON.stringify(request)),
         dataFilter: function (data) {
-            if (options.load) {
-                $("#load_area").html("");
-            }
             var json = JSON.parse(data);
-            if (json.request_msg === "auth_required") {
-                window.location = "index.html";
-            }
             return json;
         }
     };
@@ -379,18 +421,34 @@ App.prototype.xhr = function (options) {
 };
 
 App.prototype.saveToCloud = function(data){
+    var request = {};
+    request.kind = "OCR_DATA";
+    request.prop_names = ["user_id","category","primary_key_name","primary_key_value"];
+    request.prop_values = [app.user_id,data.category,data.primary_key_name,data.primary_key_value];
+    request.extra_props = ["properties"];
+    request.extra_values = [data.properties];
     jse.startLoad("Saving to cloud...");
-    data.api_key = app.api_key;
-    data.kind = "OCR_DATA";
     app.xhr({
-        load: false,
         svc: "open_data",
-        msg: "save",
-        data: data,
+        msg: "save_2",
+        data: request,
         success: function (data) {
             if (data.response.data === "success") {
                 jse.stopLoad();
                 app.msg("Data saved to cloud successfully");
+                var model = JSON.parse(jse.getRecordModel(data.primary_key_value));
+                var request1 = {
+                    prop_names : ["user_id","category", "char_map", "alpha_digit_map","length"],
+                    prop_values : [app.user_id,data.category,model.char_map, model.alpha_digit_map,model.length]
+                };
+                app.xhr({
+                    svc: "open_data",
+                    msg: "save_2",
+                    data: request1,
+                    success: function (data) {
+                        console.log(JSON.stringify(data));
+                    }
+                }); 
             }
         },
         error: function () {
@@ -406,6 +464,6 @@ App.prototype.msg = function(content){
         content : content,
         delay : 3000
     });
-}
+};
 
 window.app = new App();

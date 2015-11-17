@@ -71,4 +71,9 @@ public class JavascriptExtensions {
     public String getExistingData(String detectedText){
         return ActionActivity.getInstance().getExistingData(detectedText);
     }
+    
+    @JavascriptInterface
+    public String getRecordModel(String detectedText) {
+        return ActionActivity.getInstance().getRecordModel(detectedText);
+    }
 }
