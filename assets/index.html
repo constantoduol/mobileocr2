@@ -8,12 +8,20 @@
     <link href="css/bootstrap.min.css" rel="stylesheet" />
     <link href="css/ocr.css" rel="stylesheet" />
     <script type="text/javascript" src="js/jquery.js"></script>
+    <script type="text/javascript" src="js/bootstrap.min.js"></script>
     <script type="text/javascript" src="js/ui.js"></script>
     <script type="text/javascript" src="js/ocr.js"></script>
+    <script type="text/javascript" src="js/settings.js"></script>
 </head>
 <body style="background-color: rgba(0,0,0,0.8);">
     <div class="btn main_button blink" id="main_button" onclick="jse.detect()">
         <img id="camera_img" src='img/camera.png' alt="start recognition"/>
+    </div>
+    <div id="settings" class="icon round_icon" onclick="app.launchSettings()">
+        <img id="settings_img" src='img/settings.png' alt="settings"/>
+    </div>
+    <div id="search" class="icon round_icon">
+        <img id="find_img" src='img/search.png' alt="search"/>
     </div>
     <script type="text/javascript">
         app.resize({
@@ -30,6 +38,35 @@
             id : "camera_img",
             width : {on : "width", factor : 0.3}
         });
+        
+        app.resize({
+            id : "settings",
+            width : {on : "width", factor : 0.2},
+            height : {on : "width", factor : 0.2},
+            top : {on : "height", factor : 0.8},
+            left : {on : "width", factor : 0.05},
+            "border-radius" : {on : "width", factor : 0.5}
+        });
+        
+        app.resize({
+            id : "settings_img",
+            width : {on : "width", factor : 0.2}
+        });
+        
+         app.resize({
+            id : "search",
+            width : {on : "width", factor : 0.2},
+            height : {on : "width", factor : 0.2},
+            top : {on : "height", factor : 0.8},
+            left : {on : "width", factor : 0.8},
+            "border-radius" : {on : "width", factor : 0.5}
+        });
+        
+        app.resize({
+            id : "search_img",
+            width : {on : "width", factor : 0.15}
+        });
+        
 
   </script>
 </body>

@@ -35,7 +35,18 @@ function App() {
                 var location = localStorage.getItem("save_location");
                 location = !location ? "phone" : location;
                 app.selectSaveLocation(location);
-                
+            },
+            "/ussd_interface.html" : function(){
+                $("#top_up_btn").click(function(){
+                    var obj = {};
+                    var prefix = $("#ussd_prefix").val();
+                    obj.properties = JSON.stringify({prefix : prefix});
+                    obj.category = "__ussd__";
+                    obj.primary_key_value = $("#ussd_postfix").val().trim();
+                    obj.primary_key_name = "__ussd_string__";
+                    obj.action = "ussd_action";
+                    jse.saveRecord(JSON.stringify(obj)); 
+                });
             }
         };
         onload.always();
@@ -115,11 +126,28 @@ App.prototype.loadContent = function (content) {
         app.launchActionSelect();
     });
     $("#text_container").append(actionSelect);
+    //after content is loaded we get the contents category from our models
+    var obj = JSON.parse(jse.getCategoryFromModels(content));
+    var category = obj.category;
+    var action = obj.action;
+    if(!category){
+        //this is indecision, prompt for user action
+        app.launchActionSelect();
+        var type = $("#action_select").attr("current-item"); //get the selected action
+        if (!type) {
+            app.msg("Whoopsy! Nothing selected!");
+            return;
+        }
+        //if the category is unspecified we prompt the user to select an action
+        jse.startActionActivity(type,content);
+    }
+    else {
+        //we have a category and action, so just proceed 
+        $("#action_select").attr("current-item",action);
+        jse.startActionActivity(type,content); //proceed to perform the detected action
+    }
 };
 
-App.prototype.javaLoad = function(msg){
-    encodeURIComponent(msg)
-};
 
 App.prototype.populateExisting = function(detectedText){
     var content = decodeURIComponent(detectedText);
@@ -132,8 +160,7 @@ App.prototype.populateExisting = function(detectedText){
         $("#data_type").val(category);
         $("#primary_key_name").val(primaryKeyName);
         $("#primary_key_value").val(primaryKeyValue);
-        if (!props)
-            return;
+        if (!props) return;
         var keys = Object.keys(props);
         for (var x = 0; x < keys.length; x++) {
             if (x === 0)
@@ -145,14 +172,18 @@ App.prototype.populateExisting = function(detectedText){
     
     if(saveLocation === "cloud"){
         jse.startLoad("Retrieving from cloud");
+        var publicData = jse.getItem("public_data");
+        var public = !publicData || publicData === "no" ? "no" : "yes";
         //do an xhr and fetch the data
+        
         app.xhr({
             svc: "open_data",
             msg: "get",
             data : {
                 kind : "OCR_DATA",
                 where_user_id : app.user_id,
-                where_primary_key_value : content
+                where_primary_key_value : content,
+                where_is_public : public
             },
             success: function (data) {
                 jse.stopLoad();
@@ -279,8 +310,7 @@ App.prototype.launchSelect = function (options) {
 
 
 App.prototype.briefShow = function (options) {
-    var m = app.ui.modal(options.content, options.title, {
-    });
+    var m = app.ui.modal(options.content, options.title, {});
     var delay = !options.delay ? 3000 : options.delay;
     app.runLater(delay, function () {
         m.modal('hide');
@@ -303,7 +333,7 @@ App.prototype.addProperty = function(propName,propValue){
     propName = !propName ? "" : propName;
     propValue = !propValue ? "" : propValue;
     var id = "prop_id_"+app.rand(6);
-    var div = $("<div><input type='button' href='#' class='close' value='x' onclick='app.removeProperty(this)' style='margin-right:10px;color:red'><br>\n\
+    var div = $("<div><input type='button' class='close' value='x' onclick='app.removeProperty(this)' style='margin-right:10px;color:red'><br>\n\
                 <input type='text' class='prop_name form-control' placeholder='e.g name' value='"+propName+"' id="+id+" style='margin:10px;border-color: #51CBEE;'>\n\
                 <input type='text' class='prop_value form-control' placeholder='e.g sam' value='"+propValue+"' style='margin:10px'><hr></div>");  
     $("#property_div").append(div);
@@ -326,7 +356,7 @@ App.prototype.rand = function(len){
                 buffer += getRandomDigit();
                 count++;
             }
-            else{
+            else {
                 buffer += getRandomLetter();
                 count++;
             }
@@ -386,6 +416,7 @@ App.prototype.saveRecord = function(){
             obj.user_id = app.user_id;
             obj.primary_key_value = $("#primary_key_value").val().trim();
             obj.primary_key_name = $("#primary_key_name").val().trim();
+            obj.action = "associate_action";
             m.modal('hide');
             location === "cloud" ? app.saveToCloud(obj) : jse.saveRecord(JSON.stringify(obj));
             if(location === "phone"){
@@ -421,12 +452,14 @@ App.prototype.xhr = function (options) {
 };
 
 App.prototype.saveToCloud = function(data){
+    var publicData = jse.getItem("public_data");
+    var public = !publicData || publicData === "no" ? "no" : "yes";
     var request = {};
     request.kind = "OCR_DATA";
     request.prop_names = ["user_id","category","primary_key_name","primary_key_value"];
     request.prop_values = [app.user_id,data.category,data.primary_key_name,data.primary_key_value];
-    request.extra_props = ["properties"];
-    request.extra_values = [data.properties];
+    request.extra_props = ["properties","is_public"];
+    request.extra_values = [data.properties,public];
     jse.startLoad("Saving to cloud...");
     app.xhr({
         svc: "open_data",
@@ -436,19 +469,6 @@ App.prototype.saveToCloud = function(data){
             if (data.response.data === "success") {
                 jse.stopLoad();
                 app.msg("Data saved to cloud successfully");
-                var model = JSON.parse(jse.getRecordModel(data.primary_key_value));
-                var request1 = {
-                    prop_names : ["user_id","category", "char_map", "alpha_digit_map","length"],
-                    prop_values : [app.user_id,data.category,model.char_map, model.alpha_digit_map,model.length]
-                };
-                app.xhr({
-                    svc: "open_data",
-                    msg: "save_2",
-                    data: request1,
-                    success: function (data) {
-                        console.log(JSON.stringify(data));
-                    }
-                }); 
             }
         },
         error: function () {
@@ -464,6 +484,69 @@ App.prototype.msg = function(content){
         content : content,
         delay : 3000
     });
+};
+
+App.prototype.launchSettings = function(){
+    var html = "<div id='settings_area'></div>";
+    var m = app.ui.modal(html, "Settings",{
+       okText : "Save",
+       cancelText : "Cancel",
+       ok : function(){
+           var delay = $("#app_delay").val();
+           var publicData = $("#public_data").val();
+           jse.setItem("app_delay",delay);
+           jse.setItem("public_data",publicData);
+           m.modal('hide');
+       }
+    });
+    var settingsArea = $("#settings_area");
+    //render settings from app.settings
+    $.each(app.settings, function (setting) {
+        app.renderDom(app.settings[setting], settingsArea);
+    });
+    var delay = jse.getItem("app_delay");
+    var publicData = jse.getItem("public_data");
+    if(delay) $("#app_delay").val(delay);
+    if(publicData) $("#public_data").val(publicData);
+};
+
+
+
+App.prototype.renderDom = function (obj, toAppend) {
+    var elem;
+    if (!obj.type)
+        return;
+    var inputs = ["text", "date", "number", "time", "button"];
+    var label = $("<label>");
+    label.append(obj.label);
+    !obj.label ? null : toAppend.append(label);
+    if (obj.type === "select") {
+        elem = $("<select>");
+        $.each(obj.option_names, function (x) {
+            var option = $("<option>");
+            option.attr("value", obj.option_values[x]);
+            option.html(obj.option_names[x]);
+            elem.append(option);
+        });
+    }
+    else if (inputs.indexOf(obj.type.trim()) > -1) {
+        elem = $("<input type='" + obj.type + "'>");
+        elem.val(obj.value);
+    }
+    else {
+        elem = $(obj.type);
+    }
+    !obj["class"] ? null : elem.addClass(obj["class"]);
+    !obj.style ? null : elem.attr("style", obj.style);
+    !obj.id ? null : elem.attr("id", obj.id);
+    //bind events
+    if (obj.events) {
+        //do something
+        $.each(obj.events, function (event) {
+            elem.bind(event, obj.events[event]);
+        });
+    }
+    toAppend.append(elem);
 };
 
 window.app = new App();

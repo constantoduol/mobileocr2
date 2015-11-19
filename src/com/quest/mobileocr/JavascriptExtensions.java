@@ -76,4 +76,9 @@ public class JavascriptExtensions {
     public String getRecordModel(String detectedText) {
         return ActionActivity.getInstance().getRecordModel(detectedText);
     }
+    
+    @JavascriptInterface
+    public String getCategoryFromModels(String detectedText) {
+        return ActionActivity.getInstance().getCategoryFromModels(detectedText);
+    }
 }

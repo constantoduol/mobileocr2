@@ -33,8 +33,8 @@ public class Database extends SQLiteOpenHelper {
                 new String[]{"TEXT", "TEXT","TEXT","TEXT"});
         
         addTable(db, "PATTERN_DATA",
-                new String[]{"category", "char_map", "alpha_digit_map","length"},
-                new String[]{"TEXT", "TEXT", "TEXT", "INT"});
+                new String[]{"category", "char_map", "action"},
+                new String[]{"TEXT", "TEXT", "TEXT"});
     }
 
     @Override
