@@ -158,3 +158,9 @@ h4 {
     font-size: 30px;
     background-color: lightgrey;
 }
+
+.dropdown-menu {
+    padding : 5px;
+    font-size: 20px;
+    width : 100%;
+}

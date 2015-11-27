@@ -8,14 +8,12 @@ import android.graphics.Bitmap;
 import android.net.Uri;
 import android.util.Log;
 
-import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 
 import com.abbyy.mobile.ocr4.Engine;
 import com.abbyy.mobile.ocr4.RecognitionConfiguration;
 import com.abbyy.mobile.ocr4.RecognitionLanguage;
-import com.abbyy.mobile.ocr4.RecognitionManager;
 import com.abbyy.mobile.ocr4.RecognitionManager.RotationType;
 
 import com.quest.mobileocr.utils.ImageUtils;

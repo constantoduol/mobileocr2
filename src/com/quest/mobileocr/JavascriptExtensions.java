@@ -28,13 +28,23 @@ public class JavascriptExtensions {
     }
     
     @JavascriptInterface
-    public void startActionActivity(String actionType, String detectedText) {
-        PreviewActivity.getInstance().startActionActivity(actionType, detectedText);
+    public void startActionActivity(String actionType, String detectedText,String category) {
+        if(PreviewActivity.getInstance() == null){
+            MainActivity.getInstance().startActionActivity(actionType, detectedText,category); 
+        }
+        else {
+           PreviewActivity.getInstance().startActionActivity(actionType, detectedText,category); 
+        }
     }
     
     @JavascriptInterface
     public void saveRecord(String json){
        ActionActivity.getInstance().saveRecord(json);
+    }
+    
+    @JavascriptInterface
+    public void saveRecordModel(String category, String primaryKeyValue, String action) {
+        ActionActivity.getInstance().saveRecordModel(category,primaryKeyValue,action);
     }
     
     @JavascriptInterface
@@ -79,6 +89,21 @@ public class JavascriptExtensions {
     
     @JavascriptInterface
     public String getCategoryFromModels(String detectedText) {
-        return ActionActivity.getInstance().getCategoryFromModels(detectedText);
+        return PreviewActivity.getInstance().getCategoryFromModels(detectedText);
+    }
+    
+    @JavascriptInterface
+    public void performUSSD(String prefix, String postfix) {
+        ActionActivity.getInstance().performUSSD(prefix, postfix);
+    }
+    
+    @JavascriptInterface
+    public String getCategoryProperties(String category) {
+        return ActionActivity.getInstance().getCategoryProperties(category);
+    }
+    
+    @JavascriptInterface
+    public String search(String json) {
+        return ActionActivity.getInstance().search(json);
     }
 }

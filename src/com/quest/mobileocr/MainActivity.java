@@ -92,6 +92,13 @@ public class MainActivity extends Activity{
 //        }
 //    }
 
+    public void startActionActivity(String actionType, String detectedText, String category) {
+        Intent intent = new Intent(this, ActionActivity.class);
+        intent.putExtra("action_type", actionType);
+        intent.putExtra("detected_text", detectedText);
+        intent.putExtra("category", category);
+        startActivity(intent);
+    }
 
 
 

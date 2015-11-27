@@ -6,7 +6,12 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
+import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.Arrays;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 public class Database extends SQLiteOpenHelper {
 
@@ -29,12 +34,12 @@ public class Database extends SQLiteOpenHelper {
                 new String[]{"TEXT","TEXT"});
         //category, primary_key_name, primary_key_value, properties
         addTable(db, "OCR_DATA",
-                new String[]{"category", "primary_key_name","primary_key_value","properties"},
-                new String[]{"TEXT", "TEXT","TEXT","TEXT"});
+                new String[]{"category", "primary_key_name","primary_key_value","properties","timestamp"},
+                new String[]{"TEXT", "TEXT","TEXT","TEXT","LONG"});
         
         addTable(db, "PATTERN_DATA",
-                new String[]{"category", "char_map", "action"},
-                new String[]{"TEXT", "TEXT", "TEXT"});
+                new String[]{"category", "char_map", "action","timestamp"},
+                new String[]{"TEXT", "TEXT", "TEXT","LONG"});
     }
 
     @Override
@@ -83,7 +88,7 @@ public class Database extends SQLiteOpenHelper {
             String value = "'"+data[x]+"'";
             sql = x == cols.length - 1 ? sql.append(col).append(" = ").append(value) : sql.append(col).append(" = ").append(value).append(" AND ");
         }
-        Log.i("sql",sql.toString());
+        Log.i("sql:exists",sql.toString());
         Cursor cs = dbRead.rawQuery(sql.toString(), null);
         int count = 0;
         try {
@@ -122,20 +127,21 @@ public class Database extends SQLiteOpenHelper {
             }
             builder.append(" ").append(conditions[conditions.length - 1]);
         }
-        Log.i("sql",builder.toString());
+        Log.i("sql:update",builder.toString());
         dbWrite.execSQL(builder.toString());
     }
     
-    public static void doInsert(final String table,final String [] cols,final String [] values){
+    public static void doInsert(final String table,final String [] cols,final Object [] values){
         Callback cb = new Callback() {
             @Override
             public Object doneInBackground() {
                 ContentValues data = new ContentValues();
                 for(int x = 0; x < cols.length; x++){
                     String col = cols[x];
-                    String value = values[x];
-                    data.put(col, value);
+                    Object value = values[x];
+                    data.put(col, value.toString());
                 }
+                Log.i("sql:insert",data.toString());
                 dbWrite.insert(table, null, data);
                 return null;
             }
@@ -207,6 +213,35 @@ public class Database extends SQLiteOpenHelper {
         }
     }
     
+    
+    public JSONObject query(String sql) {
+        JSONObject json = new JSONObject();
+        try {
+            Cursor cs = dbRead.rawQuery(sql, null);
+            if (cs == null) {
+                return new JSONObject();
+            }
+            String [] labels = cs.getColumnNames();
+            for (String label : labels) {
+                json.put(label, new JSONArray());
+            }
+            while (cs.moveToNext()) {
+                for (int x = 0; x < labels.length; x++) {
+                    try {
+                        String value = cs.getString(x);
+                        ((JSONArray) json.get(labels[x])).put(value);
+                    } catch (Exception e) {
+                        
+                    }
+                }
+            }
+            cs.close();
+            return json;
+        } catch (Exception ex) {
+            return json;
+        }
+    }
+    
     public static ArrayList<ArrayList<String>> doSelect(String[] columnNames, String[] tableNames, String[] conditions) {
         //Select col1,col2 from table1 where 
         StringBuilder builder = new StringBuilder("SELECT");
@@ -226,8 +261,9 @@ public class Database extends SQLiteOpenHelper {
             }
             builder.append(" ").append(conditions[conditions.length - 1]);
         }
+        builder.append(" ORDER BY timestamp desc");
         String sql = builder.toString();
-        Log.i("app", sql);
+        Log.i("sql:select",sql);
         Cursor cs = dbRead.rawQuery(sql,null);
         try {
             ArrayList<ArrayList<String>> all = new ArrayList();
@@ -247,6 +283,9 @@ public class Database extends SQLiteOpenHelper {
 
     }
     
+    public SQLiteDatabase dbRead(){
+        return dbRead;
+    }
     
 
     public static void remove(final String key){

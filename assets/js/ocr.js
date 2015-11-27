@@ -38,15 +38,21 @@ function App() {
             },
             "/ussd_interface.html" : function(){
                 $("#top_up_btn").click(function(){
-                    var obj = {};
-                    var prefix = $("#ussd_prefix").val();
-                    obj.properties = JSON.stringify({prefix : prefix});
-                    obj.category = "__ussd__";
-                    obj.primary_key_value = $("#ussd_postfix").val().trim();
-                    obj.primary_key_name = "__ussd_string__";
-                    obj.action = "ussd_action";
-                    jse.saveRecord(JSON.stringify(obj)); 
+                    app.performUSSD();
                 });
+            },
+            "/search_interface.html" : function(){
+                var location = localStorage.getItem("save_location");
+                location = !location ? "phone" : location;
+                app.selectSaveLocation(location);
+                $("#phone_save").click(function () {
+                    app.selectSaveLocation("phone");
+                });
+                $("#cloud_save").click(function () {
+                    app.selectSaveLocation("cloud");
+                });
+                app.setUpAuto(app.autocomplete_data.data_type);
+                app.setUpAuto(app.autocomplete_data.primary_key_value);
             }
         };
         onload.always();
@@ -54,6 +60,21 @@ function App() {
     });
 }
 
+App.prototype.performUSSD = function(){
+    var obj = {};
+    var prefix = $("#ussd_prefix").val().trim();
+    var postfix = $("#ussd_postfix").val().trim();
+    if(!prefix){
+        app.msg("Please specify a prefix e.g 141");
+        return;
+    }
+    if(!postfix){
+        app.msg("Please specify the ussd recharge code");
+        return;
+    }
+    jse.performUSSD(prefix,postfix);
+    jse.saveRecordModel(prefix,postfix,"ussd_action"); 
+};
 
 App.prototype.doResize = function () {
     for (var x = 0; x < app.resizeables.length; x++) {
@@ -75,7 +96,6 @@ App.prototype.doResize = function () {
                 dimen = value.factor * dim[1] + "px";
             }
             elem.css(key, dimen);
-
         }
     }
 };
@@ -115,8 +135,9 @@ App.prototype.getDim = function () {
 
 App.prototype.loadContent = function (content) {
     content = decodeURIComponent(content);
+    var text = content === "!#__blanks__#!" ? "" : content;
     $("#text_container").addClass("black-view");
-    $("#text_container").html("<span id='detected_text'>"+content+"</span>");
+    $("#text_container").html("<span id='detected_text'>"+text+"</span>");
     var actionSelect = $(
             "<div id='action_select_container'>"+
             "<span id='action_select'>Select Action</span>"+
@@ -126,30 +147,88 @@ App.prototype.loadContent = function (content) {
         app.launchActionSelect();
     });
     $("#text_container").append(actionSelect);
+    if(content === "!#__blanks__#!") return; //this is just a screen refresh
     //after content is loaded we get the contents category from our models
-    var obj = JSON.parse(jse.getCategoryFromModels(content));
+    
+    var obj = JSON.parse(jse.getCategoryFromModels(text));
     var category = obj.category;
     var action = obj.action;
     if(!category){
         //this is indecision, prompt for user action
-        app.launchActionSelect();
-        var type = $("#action_select").attr("current-item"); //get the selected action
-        if (!type) {
-            app.msg("Whoopsy! Nothing selected!");
-            return;
-        }
-        //if the category is unspecified we prompt the user to select an action
-        jse.startActionActivity(type,content);
+        app.launchActionSelect(function(){
+            var type = $("#action_select").attr("current-item"); //get the selected action
+            if (!type) {
+                app.msg("Whoopsy! Nothing selected!");
+                return;
+            }
+            //if the category is unspecified we prompt the user to select an action
+            jse.startActionActivity(type, text, category); 
+        },text);
     }
     else {
-        //we have a category and action, so just proceed 
-        $("#action_select").attr("current-item",action);
-        jse.startActionActivity(type,content); //proceed to perform the detected action
+        //we have a category and action, so just proceed
+        //we need to take our delays into mind and execute them
+        var appDelay = jse.getItem("app_delay");
+        var delay = !appDelay ? 5 : parseInt(appDelay); //this is the delay we take before going forward
+        //we will need to countdown in the proceed button to show that we are going to proceed
+        //this gives room for the user to cancel a selected category and action 
+        
+        var descripAction;
+        if(action === "ussd_action"){
+            descripAction = "USSD";
+        }
+        else if(action === "associate_action"){
+            descripAction = "Save Record";
+        }
+        else if(action === "web_search_action"){
+            descripAction = "Web Search";
+        }
+        app.briefShow({
+            title : "Detected Values",
+            content : "Category : <span>"+category+"</span>\n\
+                    <br>Action : <span>"+descripAction+"</span>\n\
+                    <br>Detected text : <span>"+text+"</span>",
+            delay : 4000
+        });
+        app.runLater(4000,function(){//start this once we finish displaying the results
+            if (delay > 0) {
+                app.countDown(delay, function () {
+                    $("#action_select").attr("current-item", action);
+                    jse.startActionActivity(action, text, category); //proceed to perform the detected action
+                });
+            } 
+        });
     }
 };
 
+App.prototype.countDown = function(delay,onfinish){
+    var div = $("<div id='count_area' style='z-index:1000;position:absolute;font-size:60px;text-align:center' class='round_icon'>"+delay+"</div>");
+    $("#img_container").append(div);
+    app.resize({
+        id: "count_area",
+        width: {on: "width", factor: 0.25},
+        height: {on: "width", factor: 0.25},
+        top: {on: "height", factor: 0.78},
+        left: {on: "width", factor: 0.7},
+        "line-height": {on : "width", factor : 0.25}
+    });
+    var interval = setInterval(function(){
+        var currDelay = parseInt($("#count_area").html());
+        var newDelay = currDelay === 0 ? 0 : --currDelay;
+        $("#count_area").html(newDelay);
+        if (newDelay === 0){
+            $("#count_area").remove();
+            clearInterval(interval);
+            if(onfinish) onfinish();
+        }
+    },1000);
+    div.click(function () {
+        $("#count_area").remove();
+        clearInterval(interval);
+    });
+};
 
-App.prototype.populateExisting = function(detectedText){
+App.prototype.populateExisting = function(detectedText,category){
     var content = decodeURIComponent(detectedText);
     var saveLocation = localStorage.getItem("save_location");
     function populate(data){
@@ -175,20 +254,41 @@ App.prototype.populateExisting = function(detectedText){
         var publicData = jse.getItem("public_data");
         var public = !publicData || publicData === "no" ? "no" : "yes";
         //do an xhr and fetch the data
-        
         app.xhr({
             svc: "open_data",
             msg: "get",
             data : {
                 kind : "OCR_DATA",
                 where_user_id : app.user_id,
-                where_primary_key_value : content,
-                where_is_public : public
+                where_primary_key_value : content
             },
             success: function (data) {
-                jse.stopLoad();
                 var r = data.response.data;
-                var cloudData = [r.category[0],r.primary_key_name[0], r.primary_key_value[0], r.properties[0]];
+                if(r.category.length === 0){
+                    app.xhr({
+                        svc: "open_data",
+                        msg: "get",
+                        data: {
+                            kind: "OCR_DATA",
+                            where_user_id: app.user_id,
+                            where_category : category
+                        },
+                        success: function (data) {
+                            jse.stopLoad();
+                            var d = data.response.data;
+                            var len = d.category.length - 1; //the most recent data
+                            var props = JSON.parse(d.properties[len]);
+                            for(var prop in props){
+                                props[prop] = "";
+                            }
+                            var cloudData = [d.category[len], d.primary_key_name[len], d.primary_key_value[len], JSON.stringify(props)];
+                            populate(cloudData);
+                        }
+                    });
+                    return;
+                }
+                var len = r.category.length - 1; //the most recent data
+                var cloudData = [r.category[len],r.primary_key_name[len], r.primary_key_value[len], r.properties[len]];
                 populate(cloudData);
             },
             error: function () {
@@ -199,14 +299,21 @@ App.prototype.populateExisting = function(detectedText){
     }
     else {
         var data = JSON.parse(jse.getExistingData(content));
+        if(data.length === 0){
+            var props = JSON.parse(jse.getCategoryProperties(category));
+            data = [category,props.primary_key_name,content,props.props];
+            populate(data);
+            return;
+        }
         populate(data);
     }
 };
 
-App.prototype.launchActionSelect = function(){
+App.prototype.launchActionSelect = function(func,title){
+    title = !title ? "Action to take" : title;
     var actionKeys = ["ussd_action", "web_search_action", "associate_action"];
     var actionHtml = ["USSD", "Web Search", "Save Record"];
-    app.launchSelect({id: "action_select", title: "Action To Take", values: actionKeys, html: actionHtml});  
+    app.launchSelect({id: "action_select", title:title, values: actionKeys, html: actionHtml},func);  
 };
 
 App.prototype.loadImages = function (imgs) {
@@ -244,12 +351,11 @@ App.prototype.runLater = function(delay,func){
     return setTimeout(func,delay);
 };
 
+
 App.prototype.loadUserAgree = function () {
     //$("#img_container").append("<hr>");
     var img = $("<img src='img/replay.png' id='user_cancel' class='round_icon icon'>");
     img.click(function(){
-        //remove the black view where text content is shown
-        $("#text_container").removeClass("black-view");
         jse.resetScreen();
         //perform this action in the future, delay by 3 seconds
         app.runLater(3000,function(){
@@ -268,13 +374,13 @@ App.prototype.loadUserAgree = function () {
     img1.click(function () {
         var type = $("#action_select").attr("current-item"); //get the selected action
         var text = $("#detected_text").html(); //get the ocr detected text
-        if(!type){
+        if (!type) {
             //well seems we dont have a default action type
             //tell the user this
             app.launchActionSelect();
             return;
         }
-        jse.startActionActivity(type,text);
+        jse.startActionActivity(type, text, "");
     });
     $("#img_container").append(img1);
     app.resize({
@@ -286,7 +392,9 @@ App.prototype.loadUserAgree = function () {
     });
 };
 
-App.prototype.launchSelect = function (options) {
+
+
+App.prototype.launchSelect = function (options,func) {
     var currentValue = $("#" + options.id).attr("current-item");
     //options.values, options.html
     var m = app.ui.modal("", options.title, {cancelText: "Cancel"});
@@ -302,6 +410,7 @@ App.prototype.launchSelect = function (options) {
             $("#" + options.id).attr("current-item", value);
             $("#" + options.id).html(html);
             m.modal('hide');
+            if(func) func();
         });
         contDiv.append(div);
     });
@@ -317,16 +426,19 @@ App.prototype.briefShow = function (options) {
     });
 };
 
-App.prototype.loadUSSDField = function(detectedText){
+App.prototype.loadUSSDField = function(detectedText,category){
     var content = decodeURIComponent(detectedText);
+    $("#ussd_prefix").val(category);
     $("#ussd_postfix").val(content);
+    
 };
 
-App.prototype.loadRecordField = function(detectedText){
+App.prototype.loadRecordField = function(detectedText,category){
     var content = decodeURIComponent(detectedText);
     app.addProperty("",content);
     $(".prop_value").attr("id", "primary_key_value");
     $(".prop_name").attr("id", "primary_key_name");
+    app.populateExisting(detectedText,category);
 };
 
 App.prototype.addProperty = function(propName,propValue){
@@ -338,6 +450,12 @@ App.prototype.addProperty = function(propName,propValue){
                 <input type='text' class='prop_value form-control' placeholder='e.g sam' value='"+propValue+"' style='margin:10px'><hr></div>");  
     $("#property_div").append(div);
     $("#"+id).focus();
+};
+
+App.prototype.addFrozenProperty = function(propName,propValue){
+    var div = $("<div><label style='font-size:20px'>"+propName+"</label>\n\
+                <div style='font-size:16px;'>"+propValue+"</div><hr></div>");
+    $("#property_div").append(div);
 };
 
 App.prototype.rand = function(len){
@@ -486,6 +604,11 @@ App.prototype.msg = function(content){
     });
 };
 
+App.prototype.searchUI = function(){
+    jse.startActionActivity("search_action","", ""); 
+};
+
+
 App.prototype.launchSettings = function(){
     var html = "<div id='settings_area'></div>";
     var m = app.ui.modal(html, "Settings",{
@@ -547,6 +670,117 @@ App.prototype.renderDom = function (obj, toAppend) {
         });
     }
     toAppend.append(elem);
+};
+
+
+App.prototype.autocomplete_data = {
+    data_type: {
+        autocomplete: {
+            id: "data_type",
+            table: "OCR_DATA",
+            column: "category,timestamp",
+            orderby : "category asc",
+            where: function () {
+                return "category  LIKE '" + $("#data_type").val() + "%'";
+            },
+            limit: 10,
+            key: "category",
+            data: {},
+            selected: [],
+            after: function (data, index) {
+         
+            }
+        }
+    },
+    primary_key_value: {
+        autocomplete: {
+            id: "primary_key_value",
+            table: "OCR_DATA",
+            column: "primary_key_value,timestamp,properties",
+            orderby: "timestamp desc",
+            where: function () {
+                var category =  $("#data_type").val();
+                var extra = "";
+                if(category) {
+                    extra = " AND category ='"+category+"'" ;//the category is specified
+                }
+                return "primary_key_value  LIKE '" + $("#primary_key_value").val() + "%'"+extra;
+            },
+            limit: 10,
+            key: "primary_key_value",
+            data: {},
+            selected: [],
+            after: function (data, index) {
+                $("#property_div").html("");
+                var props = JSON.parse(data.properties[index]);
+                for(var prop in props){
+                    app.addFrozenProperty(prop,props[prop]);
+                }
+            }
+        }
+    }
+};
+
+App.prototype.setUpAuto = function (field) {
+    var id = field.autocomplete.id;
+    $("#" + id).typeahead({
+        source: function (query, process) {
+            app.autocomplete(field, function (data) {
+                field.autocomplete.data = data;
+                var arr = [];
+                $.each(data[field.autocomplete.key], function (x) {
+                    var val = data[field.autocomplete.key][x];
+                    if (val)
+                        arr.push(val);
+                });
+                return process(arr);
+            });
+        },
+        minLength: 1,
+        updater: function (item) {
+            var data = field.autocomplete.data;
+            var key = field.autocomplete.key;
+            var index = data[key].indexOf(item);
+            if (data.ID) {
+                $("#" + id).attr("current-item", data.ID[index]);
+            }
+            else {
+                $("#" + id).attr("current-item", item);
+            }
+            if (field.autocomplete.after)
+                field.autocomplete.after(data, index);
+
+            if (field.autocomplete_handler)
+                app.defaultAutoHandler(field.autocomplete_handler, data, index);
+            return item;
+        }
+    });
+};
+
+App.prototype.defaultAutoHandler = function (autoHandler, data, index) {
+    //{id : key, id : key}
+    $.each(autoHandler.fields, function (id) {
+        var key = autoHandler.fields[id];
+        $("#" + id).val(data[key][index]);
+    });
+    if (autoHandler.after) {
+        autoHandler.after(data, index);
+    }
+
+};
+
+
+App.prototype.autocomplete = function (field, func) {
+    var auto = field.autocomplete;
+    var requestData = {
+        table: auto.table,
+        column: auto.column,
+        where: auto.where(),
+        orderby: auto.orderby,
+        limit: auto.limit
+    };
+    var data = JSON.parse(jse.search(JSON.stringify(requestData)));
+    func(data);
 };
 
 window.app = new App();

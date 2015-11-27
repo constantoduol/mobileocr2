@@ -3,6 +3,7 @@ package com.quest.mobileocr;
 import android.app.Activity;
 import android.app.ProgressDialog;
 import android.content.Intent;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -38,6 +39,8 @@ public class ActionActivity extends Activity {
     private static String currentAction;
 
     private static String currentText;
+    
+    private static String currentCategory;
 
     private static Database db;
 
@@ -73,9 +76,9 @@ public class ActionActivity extends Activity {
                     dismissProgress();
                     //what to do after the page finishes loading
                 } else if (currentAction.equals("ussd_action")) {
-                    wv.loadUrl("javascript:app.loadUSSDField('" + Uri.encode(currentText) + "')");
+                    wv.loadUrl("javascript:app.loadUSSDField('" + Uri.encode(currentText) + "','"+currentCategory+"')");
                 } else if (currentAction.equals("associate_action")) {
-                    wv.loadUrl("javascript:app.loadRecordField('" + Uri.encode(currentText) + "')");
+                    wv.loadUrl("javascript:app.loadRecordField('" + Uri.encode(currentText) + "','"+currentCategory+"')");
                     //wv.loadUrl("javascript:app.populateExisting('"+Uri.encode(currentText)+"')");
                     //check if we have an existing record
 
@@ -108,24 +111,23 @@ public class ActionActivity extends Activity {
             Intent intent = getIntent();
             String type = intent.getStringExtra("action_type"); //the default action, this could be AI selected or user selected
             String text = intent.getStringExtra("detected_text");
+            String category = intent.getStringExtra("category");
             currentAction = type;
             currentText = text;
-            JSONObject obj = new JSONObject();
+            currentCategory = category;
             if (type.equals("web_search_action")) {
                 dialog = showProgress("Loading. Please wait...");
                 wv.loadUrl(SEARCH_URL + text); //perform a search action based on the detected text
-                obj.put("properties", new JSONObject().toString());
-                obj.put("category", "__web_search__");//a custom category
-                obj.put("primary_key_value", text);
-                obj.put("primary_key_name", "__web_search_string__"); //a custom primary key name
-                obj.put("action", type); //action to take is web_search_action
-                saveRecord(obj.toString());
+                saveRecordModel("__web_search__",text,type);
             } else if (type.equals("ussd_action")) {
                 //launch a ussd interface
                 wv.loadUrl("file:///android_asset/ussd_interface.html");
             } else if (type.equals("associate_action")) {
                 //launch a properties editor interface
                 wv.loadUrl("file:///android_asset/props_interface.html");
+            }  else if (type.equals("search_action")) {
+                //launch a properties editor interface
+                wv.loadUrl("file:///android_asset/search_interface.html");
             }
         } catch (Exception e) {
 
@@ -148,6 +150,26 @@ public class ActionActivity extends Activity {
                 new String[]{"primary_key_value = '" + content.trim() + "'"});
         JSONArray arr = data.size() > 0 ? new JSONArray(data.get(0)) : new JSONArray();//get the first value
         return arr.toString();
+    }
+    
+    public String getCategoryProperties(String category){
+        JSONObject obj = new JSONObject();
+        try {
+            ArrayList<ArrayList<String>> cats = Database.doSelect(new String[]{"*"},new String[]{"OCR_DATA"},new String[]{"category = '"+category+"'"});
+            if(cats.isEmpty()) return new JSONObject().toString();
+            ArrayList<String> list = cats.get(0);
+            JSONObject props = new JSONObject(list.get(3));
+            for(int x = 0; x < props.names().length(); x++){
+                String key = props.names().optString(x);
+                props.put(key, "");
+            }
+            obj.put("props", props.toString());
+            obj.put("primary_key_name",list.get(1));
+            return obj.toString();
+        } catch (JSONException ex) {
+            Logger.getLogger(ActionActivity.class.getName()).log(Level.SEVERE, null, ex);
+            return obj.toString();
+        }
     }
 
     public void saveRecord(String json) {
@@ -172,8 +194,8 @@ public class ActionActivity extends Activity {
                             "primary_key_value = '" + primaryKeyValue + "'"});
             } else {
                 Database.doInsert("OCR_DATA",
-                        new String[]{"category", "primary_key_name", "primary_key_value", "properties"},
-                        new String[]{category, primaryKeyName, primaryKeyValue, properties});
+                        new String[]{"category", "primary_key_name", "primary_key_value", "properties","timestamp"},
+                        new Object[]{category, primaryKeyName, primaryKeyValue, properties,System.currentTimeMillis()});
 
             }
             saveRecordModel(category, primaryKeyValue, action);
@@ -195,8 +217,8 @@ public class ActionActivity extends Activity {
                 new Object[]{category, charMap, action});
         if (!exists) {
             Database.doInsert("PATTERN_DATA",
-                    new String[]{"category", "char_map", "action"},
-                    new String[]{category, charMap, action});
+                    new String[]{"category", "char_map", "action","timestamp"},
+                    new Object[]{category, charMap, action,System.currentTimeMillis()});
         }
     }
 
@@ -214,7 +236,7 @@ public class ActionActivity extends Activity {
         }
     }
 
-    public String characterMap(String input) {
+    public static String characterMap(String input) {
         //e.g KAG 564M is lllsdddl
         String map = "";
         char[] arr = input.toCharArray();
@@ -264,167 +286,29 @@ public class ActionActivity extends Activity {
 //        }
 //        return count;
 //    }
-    //this function is our gamma in the naive bayes model
-    //where gamma(input) = class
-    public String getCategoryFromModels(String inputData) {
-        //we make sense of the model by providing input text
-        //based on the pattern data we have we try to find the 
-        //closest match to our input string
-        //get length of the string, charmap and most frequent class
-        Integer newLength = inputData.length();
-        String newCharMap = characterMap(inputData);
-        //String newAdMap = alphabetMap(inputData);
-        //use the maps to get the relevant model
-        //we will fetch existing maps from the database and compare
-        //them with the maps for this input string. we employ the
-        //naive bayes form of supervised machine learning to classify
-        //the input string
-        ArrayList<ArrayList<String>> data = Database.doSelect(
-                new String[]{"*"},
-                new String[]{"PATTERN_DATA"},
-                new String[]{""});
-        //"category", "char_map",
-        HashMap<String, Double> catAveLength = new HashMap();
-        HashMap<String, Integer> catCount = new HashMap();
-        HashMap<String, Integer> catLengthTotal = new HashMap();
-        HashMap<String, String> actions = new HashMap();
-        //remember for the pattern detection we employ two parameters
-        //as voters, therefore we have 3 votes cast in deciding a pattern string category
-        //the first vote is cast based on the length of the input string
-        //the second vote is cast based on the charmap of the input string
-        //the third vote is cast based on the most frequent category
-        //if the three different voters select different categories then the system
-        //is undecided
-        String charMapSelectedCategory = "";
-        String lengthSelectedCategory = "";
-        String freqSelectedCategory = "";
-        String charMapSelectedAction = "";
-        String lengthSelectedAction = "";
-        String freqSelectedAction = "";
-        double maxCharMapScore = 0.0;
-        for (ArrayList<String> list : data) { //iterate through the category data
-            String category = list.get(0);
-            String char_map = list.get(1);
-            String action = list.get(2); //this is the action to take based on the detected text
-            double charMapScore = compareCharMaps(newCharMap, char_map);
-            if (charMapScore > maxCharMapScore) {
-                maxCharMapScore = charMapScore;
-                charMapSelectedCategory = category;
-                charMapSelectedAction = action;
-            }
-            Integer clength = char_map.length();
-            Integer currentCatCount = catCount.get(category);
-            Integer currentCatTotal = catLengthTotal.get(category);
-            if (currentCatCount == null) {
-                catCount.put(category, 1); //the first time we encounter this category
-                catAveLength.put(category, clength.doubleValue());
-                catLengthTotal.put(category, clength);
-                actions.put(category, action);
-            } else {
-                currentCatCount++;
-                currentCatTotal += clength;
-                catCount.put(category, currentCatCount); //subsequent times we encounter this just increase the count
-                //so as we progress we will find how many times this category exists
-                Double currentAveLength = currentCatTotal.doubleValue() / currentCatCount.doubleValue();
-                catAveLength.put(category, currentAveLength);
-                catLengthTotal.put(category, currentCatTotal);
-            }
-        }
 
-        //to interpret the model we get the average length of each category
-        //once we get the average length of each category, we divide the length of our input string
-        //with the average from each category, the category that gives an answer closest one is picked
-        Iterator<String> iter = catAveLength.keySet().iterator();
-        double maxLengthScore = 0.0;
-        double maxCatFreq = 0;
-        while (iter.hasNext()) {
-            String category = iter.next();
-            String action = actions.get(category);
-            Double average = catAveLength.get(category);
-            Integer catFreq = catCount.get(category);
-            //we divide the smaller by the greater
-            double prob = newLength.doubleValue() > average ? average / newLength.doubleValue() : newLength.doubleValue() / average;
-            //this is the probability that this string belongs to the specific category
-            if (prob > maxLengthScore) {
-                maxLengthScore = prob;
-                lengthSelectedCategory = category;
-                lengthSelectedAction = action;
-            }
 
-            if (catFreq > maxCatFreq) {
-                maxCatFreq = catFreq;
-                freqSelectedCategory = category;
-                freqSelectedAction = action;
-            }
-        }
-        //we now get the category assigned
-        //if any of the strings are blank it means it is unassigned
-        //so we return a blank string
-        JSONObject obj = new JSONObject();
-        try {
-            if (charMapSelectedCategory.isEmpty() || freqSelectedCategory.isEmpty() || lengthSelectedCategory.isEmpty()) {
-                obj.put("category", "");
-                obj.put("action", "");
-                return obj.toString();
-            } else if (charMapSelectedCategory.equals(freqSelectedCategory) && freqSelectedCategory.equals(lengthSelectedCategory)) {
-            //this is a unanimous vote
-                //all three criteria agreed on one category
-                obj.put("category", charMapSelectedCategory);
-                obj.put("action", charMapSelectedAction);
-                return obj.toString();
-            } else if (charMapSelectedCategory.equals(freqSelectedCategory)) {
-                obj.put("category", charMapSelectedCategory);
-                obj.put("action", charMapSelectedAction);
-                return obj.toString();
-            } else if (freqSelectedCategory.equals(lengthSelectedCategory)) {
-                obj.put("category", freqSelectedCategory);
-                obj.put("action", freqSelectedAction);
-                return obj.toString();
-            } else if (charMapSelectedCategory.equals(lengthSelectedCategory)) {
-                obj.put("category", lengthSelectedCategory);
-                obj.put("action", lengthSelectedAction);
-                return obj.toString();
-            } else {
-                obj.put("category", "");
-                obj.put("action", "");
-                return obj.toString(); //indecision
-            }
-        } catch (Exception e) {
-            return obj.toString();
-        }
-    }
-
-    private double compareCharMaps(String charMap1, String charMap2) {
-        //here we compare two char maps for statistical closeness
-        //charmap for e.g. KAG 564M is lllsdddl
-        //equivalence of char maps is a matter of order
-        //equal char maps have same char by char value
-        //the aim of this method is to give a probability between 0 and 1
-        //of the likelihood of charMap1 belonging to the same word as charmap 2
-        if (charMap1.equals(charMap2)) {
-            return 1.0;//this is a hundred percent likelihood
-        }        //if the two strings are unequal we iterate on the shorter string
-        Integer shorter = charMap1.length() < charMap2.length() ? charMap1.length() : charMap2.length();
-        //now we go character by character inspecting the char maps
-        //we disregard the remaining part of the longer string
-        char[] arr1 = charMap1.toCharArray();
-        char[] arr2 = charMap2.toCharArray();
-        Integer equalityCount = 0;
-        //the aim of this method is to test the integrity of the order
-        //of a detected pattern string
-        for (int x = 0; x < shorter; x++) {
-            char ch1 = arr1[x];
-            char ch2 = arr2[x];
-            if (ch1 == ch2) {
-                equalityCount++;
-            }
-        }
-        return equalityCount.doubleValue() / shorter.doubleValue();
-    }
-
-    private void performUSSD(String prefix, String postfix) {
+    public void performUSSD(String prefix, String postfix) {
+        Log.i("app", "perform ussd called");
         String ussdCode = "*" + prefix + "*" + postfix + Uri.encode("#");
         startActivity(new Intent("android.intent.action.CALL", Uri.parse("tel:" + ussdCode)));
     }
-
+    
+    public String search(String json){
+        try {
+            JSONObject data = new JSONObject(json);
+            StringBuilder builder = new StringBuilder();
+            builder.append("SELECT ").append(data.optString("column")).append(" FROM ").append(data.optString("table")); //tables
+            builder = data.optString("where").length() > 0 ? builder.append(" WHERE ").append(data.optString("where")) : builder; 
+            builder = data.optString("orderby").length() > 0 ? builder.append(" ORDER BY ").append(data.optString("orderby")) : builder;
+            builder = data.optString("limit").length() > 0 ? builder.append(" LIMIT ").append(data.optString("limit")) : builder;
+            Log.i("sql:search", builder.toString());
+            JSONObject query = db.query(builder.toString());
+            Log.i("sql:search:result", query.toString());
+            return query.toString();
+        } catch (JSONException ex) {
+            Logger.getLogger(ActionActivity.class.getName()).log(Level.SEVERE, null, ex);
+            return new JSONObject().toString();
+        }
+    }
 }
