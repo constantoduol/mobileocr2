@@ -76,6 +76,7 @@ public class ActionActivity extends Activity {
                     dismissProgress();
                     //what to do after the page finishes loading
                 } else if (currentAction.equals("ussd_action")) {
+                    currentText = currentText.replaceAll("\\s+","");
                     wv.loadUrl("javascript:app.loadUSSDField('" + Uri.encode(currentText) + "','"+currentCategory+"')");
                 } else if (currentAction.equals("associate_action")) {
                     wv.loadUrl("javascript:app.loadRecordField('" + Uri.encode(currentText) + "','"+currentCategory+"')");

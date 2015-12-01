@@ -7,6 +7,7 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 
 import java.io.IOException;
+import java.util.List;
 
 /** A basic Camera preview class */
 public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback {
@@ -36,6 +37,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     public void surfaceCreated(SurfaceHolder holder) {
         // The Surface has been created, now tell the camera where to draw the preview.
         try {
+            setUpAutoFocus();
             mCamera.setPreviewDisplay(holder);
             mCamera.startPreview();
             safeToTakePicture = true;
@@ -43,9 +45,20 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
             Log.d("OCR", "Error setting camera preview: " + e.getMessage());
         }
     }
+    
+    private void setUpAutoFocus() {
+        //set camera to continually auto-focus
+        Camera.Parameters params = mCamera.getParameters();
+        List<String> modes = params.getSupportedFocusModes();
+        if(modes != null && modes.indexOf("auto") > -1){
+            params.setFocusMode(Camera.Parameters.FOCUS_MODE_AUTO);   
+        }
+        mCamera.setParameters(params);
+    }
 
     public void surfaceDestroyed(SurfaceHolder holder) {
         // empty. Take care of releasing the Camera preview in your activity.
+       
     }
 
     public void surfaceChanged(SurfaceHolder holder, int format, int w, int h) {

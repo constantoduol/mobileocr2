@@ -48,8 +48,37 @@
     height : 110px;
 }
 
+#count_area {
+    z-index:1000;
+    position:absolute;
+    font-size:60px;
+    text-align:center
+}
+.header {
+    background : #51CBEE;
+    font-size : 20px;
+    padding : 10px;
+    color : white;
+    position : fixed;
+    width : 100%;
+    top : 0;
+    left : 0;
+    z-index: 999;
+    height: 50px;
+}
 
+.footer {
+    position:fixed; 
+    width:100%; 
+    height:50px;
+    background-color:lightgrey; 
+    bottom:0px;
+    padding:5px;
+}
 
+#property_div {
+    margin-bottom: 300px;
+}
 
 
 @keyframes fade {

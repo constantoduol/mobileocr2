@@ -24,8 +24,6 @@ function App() {
                 self.user_id = userId;
             },
             "/props_interface.html": function () {
-                var height = app.getDim()[1] - 150;
-                $("#property_div").css("height", height + "px");
                 $("#phone_save").click(function(){
                    app.selectSaveLocation("phone"); 
                 });
@@ -42,17 +40,31 @@ function App() {
                 });
             },
             "/search_interface.html" : function(){
-                var location = localStorage.getItem("save_location");
-                location = !location ? "phone" : location;
-                app.selectSaveLocation(location);
+                function setUpAuto(){
+                    var location = localStorage.getItem("save_location");
+                    location = !location ? "phone" : location;
+                    app.selectSaveLocation(location);
+                    if(location === "phone"){
+                        var autocomplete = app.autocomplete_data_local;
+                        app.setUpAuto(autocomplete.data_type);
+                        app.setUpAuto(autocomplete.primary_key_value);
+                    }
+                    else {
+                        var autocomplete = app.autocomplete_data_cloud;
+                        app.setUpAuto(autocomplete.data_type);
+                        app.setUpAuto(autocomplete.primary_key_value);
+                    }
+                }
+                
                 $("#phone_save").click(function () {
                     app.selectSaveLocation("phone");
+                    setUpAuto();
                 });
                 $("#cloud_save").click(function () {
                     app.selectSaveLocation("cloud");
+                    setUpAuto();
                 });
-                app.setUpAuto(app.autocomplete_data.data_type);
-                app.setUpAuto(app.autocomplete_data.primary_key_value);
+                setUpAuto();
             }
         };
         onload.always();
@@ -192,26 +204,31 @@ App.prototype.loadContent = function (content) {
         });
         app.runLater(4000,function(){//start this once we finish displaying the results
             if (delay > 0) {
-                app.countDown(delay, function () {
+                var position = {
+                    id: "count_area",
+                    width: {on: "width", factor: 0.25},
+                    height: {on: "width", factor: 0.25},
+                    top: {on: "height", factor: 0.79},
+                    left: {on: "width", factor: 0.72},
+                    "line-height": {on: "width", factor: 0.25}
+                };
+                app.countDown(delay,"img_container", position,function () {
                     $("#action_select").attr("current-item", action);
                     jse.startActionActivity(action, text, category); //proceed to perform the detected action
                 });
-            } 
+            }
+            else {
+                jse.startActionActivity(action, text, category);
+            }
         });
     }
 };
 
-App.prototype.countDown = function(delay,onfinish){
-    var div = $("<div id='count_area' style='z-index:1000;position:absolute;font-size:60px;text-align:center' class='round_icon'>"+delay+"</div>");
-    $("#img_container").append(div);
-    app.resize({
-        id: "count_area",
-        width: {on: "width", factor: 0.25},
-        height: {on: "width", factor: 0.25},
-        top: {on: "height", factor: 0.78},
-        left: {on: "width", factor: 0.7},
-        "line-height": {on : "width", factor : 0.25}
-    });
+
+App.prototype.countDown = function(delay,append,position,onfinish){
+    var div = $("<div id='count_area' class='round_icon'>"+delay+"</div>");
+    $("#"+append).append(div);
+    app.resize(position);
     var interval = setInterval(function(){
         var currDelay = parseInt($("#count_area").html());
         var newDelay = currDelay === 0 ? 0 : --currDelay;
@@ -242,8 +259,7 @@ App.prototype.populateExisting = function(detectedText,category){
         if (!props) return;
         var keys = Object.keys(props);
         for (var x = 0; x < keys.length; x++) {
-            if (x === 0)
-                continue; //first property is already listed
+            if (keys[x] === primaryKeyName) continue; 
             var propValue = props[keys[x]];
             app.addProperty(keys[x], propValue);
         }
@@ -251,8 +267,6 @@ App.prototype.populateExisting = function(detectedText,category){
     
     if(saveLocation === "cloud"){
         jse.startLoad("Retrieving from cloud");
-        var publicData = jse.getItem("public_data");
-        var public = !publicData || publicData === "no" ? "no" : "yes";
         //do an xhr and fetch the data
         app.xhr({
             svc: "open_data",
@@ -260,36 +274,39 @@ App.prototype.populateExisting = function(detectedText,category){
             data : {
                 kind : "OCR_DATA",
                 where_user_id : app.user_id,
-                where_primary_key_value : content
+                where_primary_key_value : content,
+                order : "desc"
             },
             success: function (data) {
+                console.log(JSON.stringify(data));
                 var r = data.response.data;
-                if(r.category.length === 0){
+                if(!r.category){ //this means this record does not exist yet
                     app.xhr({
                         svc: "open_data",
                         msg: "get",
                         data: {
                             kind: "OCR_DATA",
                             where_user_id: app.user_id,
-                            where_category : category
+                            where_category : category,
+                            order : "desc"
                         },
                         success: function (data) {
-                            jse.stopLoad();
+                            console.log(JSON.stringify(data));
                             var d = data.response.data;
-                            var len = d.category.length - 1; //the most recent data
-                            var props = JSON.parse(d.properties[len]);
+                            var props = JSON.parse(d.properties[0]);
                             for(var prop in props){
                                 props[prop] = "";
                             }
-                            var cloudData = [d.category[len], d.primary_key_name[len], d.primary_key_value[len], JSON.stringify(props)];
+                            var cloudData = [d.category[0], d.primary_key_name[0],content , JSON.stringify(props)];
                             populate(cloudData);
                         }
                     });
-                    return;
                 }
-                var len = r.category.length - 1; //the most recent data
-                var cloudData = [r.category[len],r.primary_key_name[len], r.primary_key_value[len], r.properties[len]];
-                populate(cloudData);
+                else { //we have existing data yay!
+                    var cloudData = [r.category[0], r.primary_key_name[0], r.primary_key_value[0], r.properties[0]];
+                    populate(cloudData);   
+                }
+                jse.stopLoad();
             },
             error: function () {
                 jse.stopLoad();
@@ -297,7 +314,7 @@ App.prototype.populateExisting = function(detectedText,category){
             }
         }); 
     }
-    else {
+    else { //we are getting data from the phone
         var data = JSON.parse(jse.getExistingData(content));
         if(data.length === 0){
             var props = JSON.parse(jse.getCategoryProperties(category));
@@ -430,6 +447,19 @@ App.prototype.loadUSSDField = function(detectedText,category){
     var content = decodeURIComponent(detectedText);
     $("#ussd_prefix").val(category);
     $("#ussd_postfix").val(content);
+    var appDelay = jse.getItem("app_delay");
+    var delay = !appDelay ? 5 : parseInt(appDelay); //this is the delay we take before going forward
+    var position = {
+        id: "count_area",
+        width: {on: "width", factor: 0.3},
+        height: {on: "width", factor: 0.3},
+        top: {on: "height", factor: 0.48},
+        left: {on: "width", factor: 0.34},
+        "line-height": {on: "width", factor: 0.3}
+    };
+    app.countDown(delay, "button_area", position,function(){
+        app.performUSSD();
+    });
     
 };
 
@@ -450,6 +480,7 @@ App.prototype.addProperty = function(propName,propValue){
                 <input type='text' class='prop_value form-control' placeholder='e.g sam' value='"+propValue+"' style='margin:10px'><hr></div>");  
     $("#property_div").append(div);
     $("#"+id).focus();
+    app.scrollTo(id);
 };
 
 App.prototype.addFrozenProperty = function(propName,propValue){
@@ -553,8 +584,6 @@ App.prototype.xhr = function (options) {
     request.request_header.request_msg = options.msg;
     options.data.api_key = app.api_key;
     request.request_object = options.data;
-    console.log(app.server);
-    console.log(JSON.stringify(request));
     var defaultOptions = {
         method: "post",
         url: app.server,
@@ -570,14 +599,12 @@ App.prototype.xhr = function (options) {
 };
 
 App.prototype.saveToCloud = function(data){
-    var publicData = jse.getItem("public_data");
-    var public = !publicData || publicData === "no" ? "no" : "yes";
     var request = {};
     request.kind = "OCR_DATA";
     request.prop_names = ["user_id","category","primary_key_name","primary_key_value"];
     request.prop_values = [app.user_id,data.category,data.primary_key_name,data.primary_key_value];
-    request.extra_props = ["properties","is_public"];
-    request.extra_values = [data.properties,public];
+    request.extra_props = ["properties"];
+    request.extra_values = [data.properties];
     jse.startLoad("Saving to cloud...");
     app.xhr({
         svc: "open_data",
@@ -616,9 +643,7 @@ App.prototype.launchSettings = function(){
        cancelText : "Cancel",
        ok : function(){
            var delay = $("#app_delay").val();
-           var publicData = $("#public_data").val();
            jse.setItem("app_delay",delay);
-           jse.setItem("public_data",publicData);
            m.modal('hide');
        }
     });
@@ -628,9 +653,7 @@ App.prototype.launchSettings = function(){
         app.renderDom(app.settings[setting], settingsArea);
     });
     var delay = jse.getItem("app_delay");
-    var publicData = jse.getItem("public_data");
     if(delay) $("#app_delay").val(delay);
-    if(publicData) $("#public_data").val(publicData);
 };
 
 
@@ -673,7 +696,7 @@ App.prototype.renderDom = function (obj, toAppend) {
 };
 
 
-App.prototype.autocomplete_data = {
+App.prototype.autocomplete_data_local = {
     data_type: {
         autocomplete: {
             id: "data_type",
@@ -715,6 +738,61 @@ App.prototype.autocomplete_data = {
                 var props = JSON.parse(data.properties[index]);
                 for(var prop in props){
                     app.addFrozenProperty(prop,props[prop]);
+                }
+            }
+        }
+    }
+};
+
+
+App.prototype.autocomplete_data_cloud = {
+    data_type: {
+        autocomplete: {
+            id: "data_type",
+            entity: ["OCR_DATA"],
+            where_operators : [">="],
+            where_cols : function(){
+                return ["category"];
+            },
+            where_values : function () {
+                return [$("#data_type").val()];
+            },
+            limit: 10,
+            key: "category",
+            data: {},
+            after: function (data, index) {
+
+            }
+        }
+    },
+    primary_key_value: {
+        autocomplete: {
+            id: "primary_key_value",
+            entity: "OCR_DATA",
+            where_operators: [">="],
+            where_cols: function(){
+                var category = $("#data_type").val();
+                if (category) {
+                    return  ["#primary_key_value", "category"];
+                }
+                return  ["#primary_key_value"];
+            },
+            where_values : function () {
+                var category = $("#data_type").val();
+                if (category) {
+                    return  [$("#primary_key_value").val(),category];
+                }
+                return  [$("#primary_key_value").val()];
+            },
+            limit: 10,
+            key: "primary_key_value",
+            data: {},
+            selected: [],
+            after: function (data, index) {
+                $("#property_div").html("");
+                var props = JSON.parse(data.properties[index]);
+                for (var prop in props) {
+                    app.addFrozenProperty(prop, props[prop]);
                 }
             }
         }
@@ -772,15 +850,53 @@ App.prototype.defaultAutoHandler = function (autoHandler, data, index) {
 
 App.prototype.autocomplete = function (field, func) {
     var auto = field.autocomplete;
-    var requestData = {
+    console.log(JSON.stringify(auto));
+    var saveLocation = localStorage.getItem("save_location");
+    var requestData = saveLocation === "phone" ? 
+    {
         table: auto.table,
         column: auto.column,
         where: auto.where(),
         orderby: auto.orderby,
         limit: auto.limit
+    } : {
+        entity: auto.entity,
+        where_cols: auto.where_cols(),
+        where_values: auto.where_values(),
+        where_operators: auto.where_operators,
+        limit: auto.limit
     };
-    var data = JSON.parse(jse.search(JSON.stringify(requestData)));
-    func(data);
+    if(saveLocation === "phone"){
+        var data = JSON.parse(jse.search(JSON.stringify(requestData)));
+        func(data);   
+    }
+    else {
+        console.log("cloud xhr");
+        app.xhr({
+            data: requestData,
+            svc: "open_data",
+            msg: "auto_complete",
+            load: false,
+            success: function (data) {
+                console.log(JSON.stringify(data));
+                if (data && data.response.data === "FAIL") {
+                    app.showMessage(data.response.reason);
+                }
+                else {
+                    func(data);
+                }
+            }
+        });
+    }
+};
+
+App.prototype.scrollTo = function (id) {
+    // Scroll
+    if (!$("#" + id)[0])
+        return;
+    $('html,body').animate({
+        scrollTop: $("#" + id).offset().top},
+    'slow');
 };
 
 window.app = new App();

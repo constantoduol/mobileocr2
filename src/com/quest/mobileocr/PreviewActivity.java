@@ -3,11 +3,13 @@ package com.quest.mobileocr;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.Point;
 import android.hardware.Camera;
+import android.hardware.Camera.AutoFocusCallback;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.net.Uri;
@@ -30,6 +32,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.json.JSONObject;
@@ -61,6 +66,8 @@ public class PreviewActivity extends Activity {
     private static double CHAR_MAP_THRESHOLD = 0.5;
 
     private static double LENGTH_THRESHOLD = 0.5;
+  
+    private static ScheduledExecutorService ses;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -69,11 +76,12 @@ public class PreviewActivity extends Activity {
 
         // Create an instance of Camera
         mCamera = getCameraInstance();
+        
         setCameraDisplayOrientation(this, Camera.CameraInfo.CAMERA_FACING_BACK, mCamera);
         // Create our Preview view and set it as the content of our activity.
         mPreview = new CameraPreview(this, mCamera);
         preview = (FrameLayout) findViewById(R.id.camera_preview);
-        // rootView =  (FrameLayout) findViewById(R.id.root_view);
+        
         db = new Database(this);
         initWebView();
 
@@ -90,6 +98,8 @@ public class PreviewActivity extends Activity {
         previewActivity = this;
 
     }
+    
+    
 
     private void initWebView() {
         infoView = (WebView) findViewById(R.id.info_view);
@@ -152,8 +162,15 @@ public class PreviewActivity extends Activity {
             camera.setDisplayOrientation(result);
         }
     }
-
-    private void takeFuturePicture() {
+    
+    
+    
+    private boolean hasAutoFocus(){
+        PackageManager pm = getPackageManager();
+        return pm.hasSystemFeature(PackageManager.FEATURE_CAMERA) && pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_AUTOFOCUS);
+    }
+    
+    private void takeFuturePictureWithoutAutoFocus(){
         Timer timer = new Timer();
         TimerTask task = new TimerTask() {
             @Override
@@ -168,6 +185,71 @@ public class PreviewActivity extends Activity {
         };
         timer.schedule(task, FUTURE_PICTURE_DELAY, CAMERA_FREQUENCY);
     }
+    
+    
+    
+    private void takeFuturePictureWithAutoFocus(){
+        ses = Executors.newScheduledThreadPool(1);
+        //final Timer timer = new Timer();
+        final TimerTask task = new TimerTask() {
+            @Override
+            public void run() {
+                Log.i("app", "run called");
+                final TimerTask tsk = this;
+                if (mPreview.getSafeToTakePicture()) {
+                    mCamera.autoFocus(new AutoFocusCallback() {
+                        @Override
+                        public void onAutoFocus(boolean success, Camera camera) {
+                            if (success) {
+                                mCamera.takePicture(null, null, mPicture);
+                                mPreview.setSafeToTakePicture(false);
+                            }
+                            ses.schedule(tsk, CAMERA_FREQUENCY, TimeUnit.MILLISECONDS);
+                        }
+                    });
+                }
+                else {
+                    //just schedule a future run
+                    ses.schedule(tsk, CAMERA_FREQUENCY, TimeUnit.MILLISECONDS);
+                }
+            }
+        };
+        ses.schedule(task, FUTURE_PICTURE_DELAY, TimeUnit.MILLISECONDS);
+        
+    }
+    
+
+    private void takeFuturePicture() {
+        if(hasAutoFocus()){
+            takeFuturePictureWithAutoFocus();
+        }
+        else {
+            takeFuturePictureWithoutAutoFocus();
+        }
+    }
+    
+    @Override
+    public void onResume(){
+        super.onResume();
+        mPreview.setSafeToTakePicture(false);
+        Log.i("app","RESUME safe to take : "+mPreview.getSafeToTakePicture());
+        takeFuturePicture();
+    }
+    
+    @Override
+    public void onRestart() {
+        super.onRestart();
+        Log.i("app","RESTART safe to take : "+mPreview.getSafeToTakePicture());
+        mPreview.setSafeToTakePicture(false);
+        takeFuturePicture();
+    }
+    
+    @Override
+    public void onPause(){
+        super.onPause();
+        if(hasAutoFocus())
+            ses.shutdownNow();
+    }
 
     /**
      * A safe way to get an instance of the Camera object.
@@ -178,10 +260,14 @@ public class PreviewActivity extends Activity {
             c = Camera.open(); // attempt to get a Camera instance
         } catch (Exception e) {
             // Camera is not available (in use or does not exist)
-
+            e.printStackTrace();
         }
         return c; // returns null if camera is unavailable
     }
+    
+  
+    
+
 
     private Camera.PictureCallback mPicture = new Camera.PictureCallback() {
 
@@ -195,7 +281,7 @@ public class PreviewActivity extends Activity {
                     Bitmap croppedBitmap = cropBitmap(rotatedBitmap);//crop the bitmap
                     saveImage(croppedBitmap);
                     String resp = MainActivity.getInstance().getPlugin().recogniseText(croppedBitmap);//recognize text in the image
-                    Log.i("apppp", resp);
+                    Log.i("app", resp);
                     extractMeaning(resp);
                     //put the text in the webview
                     camera.startPreview(); //start preview to take the next picture

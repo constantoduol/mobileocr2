@@ -89,7 +89,8 @@
         </style>
     </head>
     <body>
-        <div class="info">
+      <div>
+        <div class="header">
             Save Record
             <span style="margin-left:20px;" class="save_icon" id="phone_save">
                 <img src="img/phone.png" style="width:25px">
@@ -98,16 +99,20 @@
                 <img src="img/cloud.png" style="width:30px">
             </span>
         </div>
-     
-        <div id="data_type_div">
-            <input type="text" id="data_type" class="form-control" placeholder="data category e.g Driver" >
+
+        <div id="main_cont">
+            <div id="data_type_div">
+                <input type="text" id="data_type" class="form-control" placeholder="data category e.g Driver" >
+            </div>
+            <div id="property_div">
+
+            </div>
         </div>
-        <div id="property_div">
-            
-        </div>
-        <div class='button_area'>
+
+        <div class="footer">
             <input type='button' value='Add Property' class="btn btn-primary" onclick="app.addProperty()"/>
             <input type='button' value='Save' class="btn btn-primary" onclick="app.saveRecord()"/>
         </div>
+      </div>
     </body>
 </html>
